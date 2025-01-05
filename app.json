@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ui",
-    "slug": "ui",
+    "name": "TUGM",
+    "slug": "TUGM",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,7 +15,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.talhadev767.TUGM"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +37,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "521507a9-e3c2-4639-829b-88a5ede6b2fa"
+      }
     }
   }
 }
