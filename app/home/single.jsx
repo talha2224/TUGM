@@ -14,6 +14,7 @@ const Single = () => {
     const [showShirts, setshowShirts] = useState(false)
     const [showGifts, setshowGifts] = useState(false)
     const [wallet, setwallet] = useState(false)
+    const [showBid, setshowBid] = useState(false)
     return (
         <View style={styles.container}>
 
@@ -43,7 +44,12 @@ const Single = () => {
                     <Text style={{ color: "#a7a7a7" }}>John</Text>
                     <Text style={{ color: "white", fontSize: 16 }}>Hi How are you ?</Text>
                 </View>
-                <Text style={{ color: "white", fontSize: 16, color: "#F78E1B", marginTop: 5 }}>Bidding 2/3</Text>
+                <View style={{ marginVertical: 5, flexDirection: "row", justifyContent: "flex-start", width: 100 }}>
+                    <Text style={{ color: "white", fontSize: 16, color: "#F78E1B" }}>Bidding 2/3</Text>
+                    <TouchableOpacity onPress={() => setshowBid(!showBid)} style={{ color: "white", backgroundColor: "#F78E1B", paddingHorizontal: 15, borderRadius: 10, marginLeft: 10 }}>
+                        <Text style={{ color: "#fff" }}>Bid</Text>
+                    </TouchableOpacity>
+                </View>
                 <Text style={{ color: "#c4c4c4", fontSize: 13 }}>Cobbles Classic sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam... see more</Text>
 
             </View>
@@ -90,6 +96,10 @@ const Single = () => {
                 </TouchableOpacity>
             </View>
 
+            <View style={{ padding: 10, backgroundColor: "rgba(0, 0, 0, 0.5)", borderRadius: 20, width: 120, marginVertical: 10,position:"absolute",top:"30%",left:"30%" }}>
+                <Text style={{ color: "#fff", fontWeight: "800" }}> <Text style={{ color: "#F78E1B" }}>$ </Text> Bid added</Text>
+            </View>
+
             {
                 showShirts &&
                 <View style={{ marginBottom: 20 }}>
@@ -113,12 +123,29 @@ const Single = () => {
 
             {
                 wallet &&
-                <View style={{ marginBottom: 20,marginLeft:20 }}>
+                <View style={{ marginBottom: 20, marginLeft: 20 }}>
                     <Pressable onPress={() => setwallet(false)}>
                         <Image source={Wallet} style={{ width: "100%" }} />
                     </Pressable>
                 </View>
+            }
 
+            {
+                showBid &&
+                <View style={{ position: "absolute", left: 20, right: 10, bottom: 30, padding: 20, backgroundColor: "#000", zIndex: 1, width: "90%", borderRadius: 30 }}>
+                    <View style={{ justifyContent: "center", alignItems: "center", flexDirection: "row", marginTop: 5 }}>
+                        <Text style={{ color: "#fff" }}>$ Add Bid</Text>
+                    </View>
+                    <Text style={{ textAlign: "center", marginTop: 10, color: "#c4c4c4" }}>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium</Text>
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity onPress={() => setshowBid(false)} style={styles.cancelButton}>
+                            <Text style={styles.cancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setshowBid(false)} style={styles.startAuctionButton}>
+                            <Text style={styles.startAuctionText}>Bid</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
             }
 
 
@@ -179,7 +206,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     bidButtonText: {
-        color: 'black',
+        color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
     },
@@ -217,6 +244,32 @@ const styles = StyleSheet.create({
         bottom: 100, // Adjust top position as needed
         left: 20,
         right: 70
+    },
+    buttonContainer: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginTop: 20
+    },
+    cancelButton: {
+        borderWidth: 1,
+        backgroundColor: "#1A1A1A",
+        borderRadius: 25,
+        padding: 10,
+        width: "48%",
+        alignItems: "center"
+    },
+    cancelText: {
+        color: "white"
+    },
+    startAuctionButton: {
+        backgroundColor: "orange",
+        borderRadius: 25,
+        padding: 10,
+        width: "48%",
+        alignItems: "center"
+    },
+    startAuctionText: {
+        color: "white"
     },
 });
 

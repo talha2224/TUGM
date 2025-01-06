@@ -42,7 +42,7 @@ const Register = () => {
                         <AntDesign name="lock" size={20} color="grey" style={styles.icon} />
                     </View>
 
-                    <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/home')}>
+                    <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/loader')}>
                         <Text style={styles.loginButtonText}>Sign Up</Text>
                     </TouchableOpacity>
 

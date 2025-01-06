@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Image, Text, TouchableOpacity, Pressable } from 'react-native';
 import BottomNavBar from '../../components/BottomNav'; // Import your BottomNavBar
 import { Ionicons, Feather, AntDesign } from '@expo/vector-icons';
 import SellerImage from '../../assets/images/seller.png'
-import Profile from '../../assets/images/profile.png'
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
 
 
@@ -39,11 +39,30 @@ const products = [
 const Index = () => {
     const [activeCategory, setActiveCategory] = useState('Jacket');
     const [likedItems, setLikedItems] = useState({});
+    const [location, setLocation] = useState(null);
+    const [errorMsg, setErrorMsg] = useState(null);
+
     const categories = ['Jacket', 'Shoes', 'Jeans', 'T-shirt', 'Access'];
     const handleCategoryPress = (category) => { setActiveCategory(category); };
     const handleLikePress = (itemId) => {
         setLikedItems(prevLikedItems => ({ ...prevLikedItems, [itemId]: !prevLikedItems[itemId], }));
     };
+
+    useEffect(() => {
+        (async () => {
+          // Request location permissions
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            setErrorMsg('Permission to access location was denied');
+            return;
+          }
+    
+          // Get current location
+          let location = await Location.getCurrentPositionAsync({});
+          setLocation(location);
+        })();
+      }, []);
+
     return (
         <View style={styles.container}>
 
@@ -89,7 +108,7 @@ const Index = () => {
                         <View style={styles.dot} />
                         <View style={styles.dot} />
                     </View>
-                    <TouchableOpacity style={styles.likeButton}>
+                    <TouchableOpacity style={styles.likeButton2}>
                         <AntDesign name="hearto" size={24} color="white" />
                     </TouchableOpacity>
                 </View>
@@ -253,6 +272,17 @@ const styles = StyleSheet.create({
         position: "absolute",
         bottom: 20,
         right: 20,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: "center",
+        alignItems: "center"
+    },
+    likeButton2:{
+        position: "absolute",
+        bottom: 30,
+        right: 10,
         backgroundColor: "rgba(0,0,0,0.5)",
         width: 40,
         height: 40,

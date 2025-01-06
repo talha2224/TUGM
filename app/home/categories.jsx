@@ -92,13 +92,7 @@ const Categories = () => {
                             <View style={styles.catContainer}>
                                 <View style={styles.searchBar}>
                                     <Ionicons name="search" size={20} color="gray" style={styles.searchIcon} />
-                                    <TextInput
-                                        style={styles.searchInput}
-                                        placeholder="Search for auctions"
-                                        placeholderTextColor="gray"
-                                        value={searchText}
-                                        onChangeText={setSearchText}
-                                    />
+                                    <TextInput style={styles.searchInput} placeholder="Search for auctions" placeholderTextColor="gray" value={searchText} onChangeText={setSearchText}/>
                                 </View>
                                 <View style={styles.cardList}>
                                     {filteredAuctions.map((auction, index) => (
