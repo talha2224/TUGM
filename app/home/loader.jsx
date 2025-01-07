@@ -13,7 +13,7 @@ const Loader = () => {
     }, []);
 
     return (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center",flexDirection:"column" }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center",flexDirection:"column",backgroundColor:"#000" }}>
             <Image source={Load} alt='Loader' />
             <Text style={{color:"#fff",marginTop:10,fontSize:18}}>Going Live In 3 sec</Text>
         </View>

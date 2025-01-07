@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ImageBackground, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, ImageBackground, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
 import image1 from '../assets/images/login-1.png';
@@ -9,7 +9,7 @@ import image3 from '../assets/images/login-3.png';
 const onboardingData = [
     {
         image: image1,
-        title: 'Welcome to TUGM -  Shop, Stream, and Bid in Real-Time!',
+        title: 'Welcome to TUGM - Shop, Stream, and Bid in Real-Time!',
         description: 'Experience the future of shopping with live streaming, exclusive auctions, and instant purchases',
     },
     {
@@ -27,10 +27,17 @@ const onboardingData = [
 const Onboarding = () => {
     const [currentScreen, setCurrentScreen] = useState(0);
     const { width, height } = Dimensions.get('window');
+    const translateX = useRef(new Animated.Value(0)).current;
 
     const nextScreen = () => {
         if (currentScreen < onboardingData.length - 1) {
-            setCurrentScreen(currentScreen + 1);
+            Animated.timing(translateX, {
+                toValue: -(currentScreen + 1) * width,
+                duration: 300,
+                useNativeDriver: true,
+            }).start(() => {
+                setCurrentScreen(currentScreen + 1);
+            });
         } else {
             router.push('/login');
         }
@@ -42,34 +49,40 @@ const Onboarding = () => {
 
     return (
         <View style={styles.container}>
-            <ImageBackground source={onboardingData[currentScreen].image} style={[styles.backgroundImage, { width, height }]} resizeMode="cover">
-                <View style={styles.contentContainer}>
-                    <View style={[styles.textContainer, styles.shadowBox]}>
-                        <Text style={styles.title}>{onboardingData[currentScreen].title}</Text>
-                        <Text style={styles.description}>{onboardingData[currentScreen].description}</Text>
-                    </View>
-
-                    <View style={[styles.bottomContainer, styles.bottomShadow]}>
-
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity onPress={skipOnboarding}>
-                                <Text style={styles.skipButton}>Skip</Text>
-                            </TouchableOpacity>
-                            <View style={styles.dotsContainer}>
-                                {onboardingData.map((_, index) => (
-                                    <View key={index} style={[styles.dot, currentScreen === index && styles.activeDot]} />
-                                ))}
+            <Animated.View style={{ flexDirection: "row", width: width * onboardingData.length, transform: [{ translateX }], }}>
+                {onboardingData.map((item, index) => (
+                    <ImageBackground key={index} source={item.image} style={[styles.backgroundImage, { width, height }]} resizeMode="cover">
+                        <View style={styles.contentContainer}>
+                            <View style={[styles.textContainer, styles.shadowBox]}>
+                                <Text style={styles.title}>{item.title}</Text>
+                                <Text style={styles.description}>{item.description}</Text>
                             </View>
-                            <TouchableOpacity style={styles.nextButton} onPress={nextScreen}>
-                                <AntDesign name="arrowright" size={20} color="black" />
-                            </TouchableOpacity>
+                            <View style={[styles.bottomContainer, styles.bottomShadow]}>
+                                <View style={styles.buttonContainer}>
+                                    <TouchableOpacity onPress={skipOnboarding}>
+                                        <Text style={styles.skipButton}>Skip</Text>
+                                    </TouchableOpacity>
+                                    <View style={styles.dotsContainer}>
+                                        {onboardingData.map((_, index) => (
+                                            <View key={index} style={[styles.dot, currentScreen === index && styles.activeDot]} />
+                                        ))}
+                                    </View>
+                                    <TouchableOpacity style={styles.nextButton} onPress={nextScreen}>
+                                        <AntDesign name="arrowright" size={20} color="black" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         </View>
-                    </View>
-                </View>
-            </ImageBackground>
+                    </ImageBackground>
+                ))}
+            </Animated.View>
+
+
         </View>
     );
 };
+
+export default Onboarding;
 
 const styles = StyleSheet.create({
     container: {
@@ -148,5 +161,3 @@ const styles = StyleSheet.create({
 
     },
 });
-
-export default Onboarding;
