@@ -105,21 +105,18 @@ const SingleStreamScreen = ({ route }) => {
         let userId = await AsyncStorage.getItem('userId');
         try {
             let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: amount * 100, currency: "usd" });
-            console.log(paymentIntentRes?.data?.clientSecret)
             if (!paymentIntentRes?.data?.clientSecret) {
                 throw new Error("Failed to fetch payment intent");
             }
             let clientSecret = paymentIntentRes?.data?.clientSecret
             if (clientSecret) {
                 const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
-                console.log(initResponse, 'initResponse')
                 if (initResponse.error) {
                     Alert.alert(initResponse?.error?.message)
                     return
                 }
                 else {
                     const paymentResponse = await presentPaymentSheet()
-                    console.log(paymentResponse)
                     if (paymentResponse.error) {
                         Alert.alert(paymentResponse?.error?.message)
                         return
@@ -153,7 +150,6 @@ const SingleStreamScreen = ({ route }) => {
 
         if (res?.data?.data) {
             ToastAndroid.show('Gift Sent!', ToastAndroid.SHORT);
-            console.log(res?.data?.data, 'res?.data?.data of handleSendGifts ')
             setshowGifts(false)
             fetchGifts()
         }
@@ -172,7 +168,6 @@ const SingleStreamScreen = ({ route }) => {
         Keyboard.dismiss();
         setshowBid(false)
         const highestBid = biddingInfo.length > 0 ? Math.max(...biddingInfo.map(bid => Number(bid.amount) || 0)) : (0);
-        console.log(highestBid, 'highestBid', amount, 'amount', biddingInfo, 'biddingInfo')
         if (amount <= highestBid) {
             Alert.alert("Bid Error", `Your bid must be higher than the current highest bid of $${highestBid}`);
             return;
@@ -180,21 +175,18 @@ const SingleStreamScreen = ({ route }) => {
 
         try {
             let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: amount * 100, currency: "usd" });
-            console.log(paymentIntentRes?.data?.clientSecret)
             if (!paymentIntentRes?.data?.clientSecret) {
                 throw new Error("Failed to fetch payment intent");
             }
             let clientSecret = paymentIntentRes?.data?.clientSecret
             if (clientSecret) {
                 const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
-                console.log(initResponse, 'initResponse')
                 if (initResponse.error) {
                     Alert.alert(initResponse?.error?.message)
                     return
                 }
                 else {
                     const paymentResponse = await presentPaymentSheet()
-                    console.log(paymentResponse)
                     if (paymentResponse.error) {
                         Alert.alert(paymentResponse?.error?.message)
                         return
@@ -257,48 +249,10 @@ const SingleStreamScreen = ({ route }) => {
     }, []);
 
 
-    // useEffect(() => {
-    //     socket.emit("joinStream", streamId);
-
-    //     const handleGift = (giftData) => {
-    //         console.log("Gift received:", giftData);
-    //         setGift(giftData);
-    //         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    //         setTimeout(() => {
-    //             Animated.timing(fadeAnim, { toValue: 0, duration: 500, useNativeDriver: true }).start(() => setGift(null));
-    //         }, 4000);
-    //     };
-
-    //     const handleBid = (bidData) => {
-    //         console.log("Bid received:", bidData);
-    //         setbidInfo(bidData);
-    //         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    //         setTimeout(() => {
-    //             setbidInfo(null);
-    //         }, 3000);
-    //         fetchBidInfo(streamInfo?.streamId);
-    //     };
-
-    //     socket.on("receiveGift", handleGift);
-    //     socket.on("receiveBid", handleBid);
-
-    //     return () => {
-    //         socket.off("receiveGift", handleGift);
-    //         socket.off("receiveBid", handleBid);
-    //     };
-    // }, [streamId]);
 
     return (
         <View style={styles.container}>
 
-            {/* <ZegoUIKitPrebuiltLiveStreaming
-                appID={APP_ID}
-                appSign={APP_SIGN}
-                userID={randomUserID}
-                userName={'Viewer :' + data?.username}
-                liveID={streamId}
-                config={{ ...AUDIENCE_DEFAULT_CONFIG, onLeaveLiveStreaming: () => { navigation.navigate('Home'); } }}
-            /> */}
 
             <ZegoUIKitPrebuiltLiveStreaming
                 appID={382727773}
@@ -315,11 +269,9 @@ const SingleStreamScreen = ({ route }) => {
                         buttons: [ZegoMenuBarButtonName.minimizingButton, ZegoMenuBarButtonName.leaveButton],
                     },
                     onWindowMinimized: () => {
-                        console.log('[Demo]AudiencePage onWindowMinimized');
                         navigation.navigate('Home');
                     },
                     onWindowMaximized: () => {
-                        console.log('[Demo]AudiencePage onWindowMaximized');
                         props.navigation.navigate('AudiencePage', {
                             userID: "123",
                             userName: "Viewer",
@@ -354,235 +306,6 @@ const SingleStreamScreen = ({ route }) => {
                     <Text style={styles.bidButtonText}>$</Text>
                 </TouchableOpacity>
             </View>
-
-            {/* {
-                biddingInfo?.some(bid => bid?.userId?._id === uId) && (
-                    <View style={{ padding: 10, backgroundColor: "rgba(0, 0, 0, 0.5)", borderRadius: 20, width: 120, marginVertical: 10, position: "absolute", top: "30%", left: "30%" }}>
-                        <Text style={{ color: "#fff", fontWeight: "800" }}> <Text style={{ color: "#F78E1B" }}>$ </Text>  Bid added</Text>
-                    </View>
-                )
-            } */}
-
-
-
-            {/* {gift && (
-                <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
-                    <Image source={giftImages[gift?.name]} style={styles.giftImage} />
-                    <Text style={styles.giftText}>{gift?.username} sent a gift!</Text>
-                </Animated.View>
-            )} */}
-
-            {/* {bidInfo && (
-                <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
-                    <Text style={styles.giftText}>{bidInfo?._doc?.username ? bidInfo?._doc?.username : "You have"} added a bid! of $ {bidInfo?.amount}</Text>
-                </Animated.View>
-            )} */}
-
-            {/* {
-                showShirts &&
-                <View style={{ marginBottom: 20, position: "absolute", bottom: 5, width: "100%", justifyContent: "center", alignItems: "center", zIndex: 10 }}>
-
-                    <View style={{ paddingHorizontal: 25, paddingVertical: 10, backgroundColor: "rgba(121, 121, 121,1)", borderRadius: 20, width: "95%" }}>
-                        <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 20, backgroundColor: "#979797" }}>
-                            <Image
-                                source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }}
-                                style={{ width: "100%", height: 250, borderRadius: 20, }}
-                            />
-                        </View>
-
-                        <ScrollView showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={{ marginTop: 10, gap: 10, flexDirection: "row", justifyContent: "space-between", flex: 1 }}>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                        </ScrollView>
-                    </View>
-
-                    <View style={{ paddingHorizontal: 25, paddingVertical: 10, backgroundColor: "rgba(121, 121, 121,1)", borderRadius: 20, width: "95%", marginTop: 15 }}>
-
-                        <View style={{ flexDirection: "row", gap: 10 }}>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ color: "#fff", fontSize: 15 }}>{streamInfo?.productId?.title}</Text>
-                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
-                                    <Text style={{ color: "#fff", fontSize: 15 }}>${streamInfo?.productId?.price}</Text>
-                                    <View style={{ flexDirection: "row", gap: 5, alignItems: "center" }}>
-                                        <Pressable onPress={() => setQuantity(quantity + 1)}><AntDesign name="plus" size={15} color="#fff" /></Pressable>
-                                        <Text style={{ color: "#fff", fontSize: 15 }}>{quantity}</Text>
-                                        <Pressable onPress={() => setQuantity(quantity - 1)}><AntDesign name="minus" size={15} color="#fff" /></Pressable>
-                                    </View>
-                                </View>
-                            </View>
-
-
-                        </View>
-
-                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: 1, marginTop: 10 }}>
-                            <View>
-                                <Text>Total</Text>
-                                <Text style={{ color: "#fff", fontSize: 20 }}>${streamInfo?.productId?.price * quantity}</Text>
-                            </View>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                <TouchableOpacity onPress={() => { handleAddToCard(streamInfo?.productId); setshowShirts(false) }} style={{ backgroundColor: "#fff", borderRadius: 20 }}>
-                                    <Text style={{ padding: 5, paddingHorizontal: 10, color: "#000" }}>Add to cart</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
-                        </TouchableOpacity>
-
-
-                    </View>
-
-                </View>
-            } */}
-
-
-            {/* {
-                showGifts &&
-                <View style={{ position: "absolute", left: 10, right: 10, bottom: 5, padding: 20, backgroundColor: "#000", zIndex: 1, width: "95%", borderRadius: 10 }}>
-
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Gifts</Text>
-                        <TouchableOpacity onPress={() => setshowShirts(false)} style={{ backgroundColor: "orange", borderRadius: 15, paddingVertical: 5, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", marginLeft: 10 }}>
-                            <AntDesign name="bank" size={13} color="#fff" />
-                            <Text style={{ color: "#fff", marginLeft: 5 }}>{data?.coins}</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={{ flexDirection: "row", columnGap: 23, flexWrap: "wrap" }}>
-                        <Pressable onPress={() => { handleSendGifts(10, "Santa") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Santa} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Santa</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>10</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(20, "Img2") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img2} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Eagle</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>20</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(15, "Img3") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img3} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Rose</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>15</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(22, "Img4") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img4} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Boxing</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>22</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(21, "Img5") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img5} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Sunflower</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>21</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(100, "Img6") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img6} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Zebra</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>100</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(29, "Img7") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img7} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Heart</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>29</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(150, "Img8") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img8} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Lion</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>150</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-
-                    </View>
-
-                    <TouchableOpacity onPress={() => setshowGifts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
-                    </TouchableOpacity>
-
-                </View>
-            } */}
-
-            {/* {
-                wallet &&
-                <View style={{ position: "absolute", left: 10, right: 10, bottom: 5, padding: 20, backgroundColor: "#000", zIndex: 1, width: "95%", borderRadius: 10 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Coins</Text>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>🪙 {data?.coins}</Text>
-                    </View>
-
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <View style={{ backgroundColor: "#5856d6", padding: 10, borderRadius: 10 }}><AntDesign name="creditcard" size={24} color="#fff" /></View>
-                        <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#747474"} style={{ flex: 1, height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, }} placeholder='Amount To Buy Coins' />
-                    </View>
-                    <TouchableOpacity onPress={proceed} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "orange", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Pay Now </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setwallet(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
-                    </TouchableOpacity>
-                </View>
-            } */}
-
-            {/* {
-                showBid &&
-                <View style={{ position: "absolute", left: 20, right: 10, bottom: 30, padding: 20, backgroundColor: "#000", zIndex: 1, width: "90%", borderRadius: 30 }}>
-                    <View style={{ justifyContent: "center", alignItems: "center", flexDirection: "row", marginTop: 5 }}>
-                        <Text style={{ color: "#fff" }}>$ Add Bid</Text>
-                    </View>
-                    <Text style={{ textAlign: "center", marginTop: 10, color: "#c4c4c4" }}>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium</Text>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <View style={{ backgroundColor: "#5856d6", padding: 10, borderRadius: 10 }}><AntDesign name="creditcard" size={24} color="#fff" /></View>
-                        <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#747474"} style={{ flex: 1, height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, }} placeholder='Amount To Bid' />
-                    </View>
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity onPress={() => setshowBid(false)} style={styles.cancelButton}>
-                            <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleBid} style={styles.startAuctionButton}>
-                            <Text style={styles.startAuctionText}>Bid</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            } */}
-
 
         </View>
     );

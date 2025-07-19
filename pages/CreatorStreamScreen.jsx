@@ -90,7 +90,6 @@ const CreatorStreamScreen = ({ route }) => {
     const setupEventHandler = () => {
         eventHandler.current = {
             onJoinChannelSuccess: () => {
-                console.log("✅ Joined channel successfully");
                 setIsJoined(true);
             },
             onUserJoined: (_connection, uid) => {
@@ -101,7 +100,6 @@ const CreatorStreamScreen = ({ route }) => {
                 }, 1000);
             },
             onUserOffline: (_connection, uid) => {
-                console.log("❌ Remote user left:", uid);
                 setagoraUid(null)
                 setRemoteUids(prev => prev.filter(id => id !== uid));
             },
@@ -179,7 +177,6 @@ const CreatorStreamScreen = ({ route }) => {
         try {
             let res = await axios.get(`${config.baseUrl}/stream/stream/${streamId}`);
             if (res?.data) {
-                console.log(res?.data?.data, 'fetchStreamInfo')
                 setStreamInfo(res?.data?.data);
             }
         } catch (error) {
@@ -228,7 +225,6 @@ const CreatorStreamScreen = ({ route }) => {
             let userId = await AsyncStorage.getItem('userId');
             if (true) {
                 let res = await axios.get(`${config.baseUrl3}/gift/${userId}/${streamInfo?._id}`);
-                console.log(res?.data?.data, 'res?.data?.data')
                 if (res?.data?.data) {
                     setGift({
                         streamId: res?.data?.data?.streamId,
@@ -338,7 +334,6 @@ const CreatorStreamScreen = ({ route }) => {
 
         if (res?.data?.data) {
             ToastAndroid.show('Gift Sent!', ToastAndroid.SHORT);
-            console.log(res?.data?.data, 'res?.data?.data of handleSendGifts ')
             setshowGifts(false)
             fetchGifts()
         }
@@ -355,14 +350,12 @@ const CreatorStreamScreen = ({ route }) => {
 
         try {
             let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: amount * 100, currency: "usd" });
-            console.log(paymentIntentRes?.data?.clientSecret)
             if (!paymentIntentRes?.data?.clientSecret) {
                 throw new Error("Failed to fetch payment intent");
             }
             let clientSecret = paymentIntentRes?.data?.clientSecret
             if (clientSecret) {
                 const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
-                console.log(initResponse, 'initResponse')
                 if (initResponse.error) {
                     Alert.alert(initResponse?.error?.message)
                     return

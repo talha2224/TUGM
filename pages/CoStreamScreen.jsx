@@ -62,7 +62,6 @@ const CoStreamScreen = ({ route }) => {
         try {
             let res = await axios.get(`${config.baseUrl}/stream/stream/${streamId}`);
             if (res?.data) {
-                console.log(res?.data?.data, 'fetchStreamInfo')
                 setStreamInfo(res?.data?.data);
             }
         } catch (error) {

@@ -31,30 +31,25 @@ const CartScreen = () => {
         }
         try {
             let paymentIntentRes = await axios.post(`${config.baseUrl}/payment/create-intent`, { amount: total * 100, currency: "usd" });
-            console.log(paymentIntentRes?.data?.clientSecret)
             if (!paymentIntentRes?.data?.clientSecret) {
                 throw new Error("Failed to fetch payment intent");
             }
             let clientSecret = paymentIntentRes?.data?.clientSecret
             if (clientSecret) {
                 const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
-                console.log(initResponse, 'initResponse')
                 if (initResponse.error) {
                     Alert.alert(initResponse?.error?.message)
                     return
                 }
                 else {
                     const paymentResponse = await presentPaymentSheet()
-                    console.log(paymentResponse)
                     if (paymentResponse.error) {
                         Alert.alert(paymentResponse?.error?.message)
                         return
                     }
                     else {
                         let res = await axios.post(`${config.baseUrl}/order/checkout`, { userId, city, country, address, phone, product: products });
-                        console.log(res?.data)
                         if (res?.data) {
-                            console.log("Order placed successfully!");
                             ToastAndroid.show('Order Completed!', ToastAndroid.SHORT);
                             dispatch(clearCart());
                             setTimeout(() => {

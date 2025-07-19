@@ -9,7 +9,6 @@ const DefaultScreen = () => {
   useEffect(() => {
     const timer = setTimeout(async() => {
       let userId = await AsyncStorage.getItem('userId');
-      console.log(userId,'uid')
       if(userId?.length>0){
         navigation.replace('Home');
         return;

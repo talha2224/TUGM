@@ -62,7 +62,6 @@ const ProfileScreen = () => {
         const options = { mediaType: 'photo', quality: 0.5, includeBase64: false, };
         launchImageLibrary(options, (response) => {
             if (response.didCancel) {
-                console.log('User cancelled image picker');
             }
             else if (response.error) {
                 console.log('ImagePicker Error:', response.error);
@@ -109,7 +108,6 @@ const ProfileScreen = () => {
             let clientSecret = paymentIntentRes?.data?.clientSecret
             if (clientSecret) {
                 const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
-                console.log(initResponse, 'initResponse')
                 if (initResponse.error) {
                     Alert.alert(initResponse?.error?.message)
                     return
@@ -163,6 +161,15 @@ const ProfileScreen = () => {
                     <Text style={styles.menuText}>Purchase History</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity onPress={() => navigation.navigate('chats')} style={styles.menuItem}>
+                    <Feather name="message-square" size={20} color="white" />
+                    <Text style={styles.menuText}>Messages</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('shipments')} style={styles.menuItem}>
+                    <Feather name="truck" size={20} color="white" />
+                    <Text style={styles.menuText}>Shipments</Text>
+                </TouchableOpacity>
+
                 {
                     (sellerMode && data?.isSubscribed) && (
 
@@ -197,7 +204,7 @@ const ProfileScreen = () => {
                 }
 
 
-                <View style={{ justifyContent: "space-between", flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#282828',paddingVertical:10}}>
+                <View style={{ justifyContent: "space-between", flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#282828', paddingVertical: 10 }}>
                     <Text style={{ color: 'white', fontSize: 16, marginRight: 10 }}>Seller Mode</Text>
                     <Switch value={sellerMode} onValueChange={(value) => switchCreatorMode(value)} trackColor={{ false: '#767577', true: '#34D399' }} thumbColor={sellerMode ? '#10B981' : '#f4f3f4'} />
                 </View>
@@ -223,6 +230,7 @@ const styles = StyleSheet.create({
     header: {
         alignItems: 'center',
         marginBottom: 30,
+        marginTop: 30
     },
     profileImage: {
         width: 100,
@@ -260,7 +268,7 @@ const styles = StyleSheet.create({
         paddingVertical: 15,
         borderTopWidth: 1,
         borderTopColor: '#282828',
-        marginBottom:30
+        marginBottom: 30
     },
     logoutText: {
         color: '#FF4500',

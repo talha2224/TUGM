@@ -84,7 +84,6 @@ const AuctionListingScreen = () => {
         try {
             let res = await axios.get(`${config.baseUrl}/category/all`);
             if (res?.data) {
-                console.log(res?.data?.data, 'fetchCategory')
                 setCategories(res?.data?.data);
                 setActiveCategory(res?.data?.data[0]?.category);
             }
@@ -99,7 +98,6 @@ const AuctionListingScreen = () => {
             setUid(userId)
             let res = await axios.get(`${config.baseUrl}/stream/active`);
             if (res?.data) {
-                console.log(res?.data?.data, 'res?.data?.data')
                 setStreams(res?.data?.data);
             }
         }
@@ -110,7 +108,6 @@ const AuctionListingScreen = () => {
     const fetchProduct = async () => {
         try {
             let res = await axios.get(`${config.baseUrl}/product/all`);
-            console.log(res?.data)
             if (res?.data) {
                 const filtered = res.data.data.filter(product => product?.categoryId?.category === "Shirts");
                 setProducts(res?.data?.data);

@@ -25,6 +25,10 @@ import CreateProductScreen from './pages/CreateProductScreen';
 import CreatorStreamScreen from './pages/CreatorStreamScreen';
 import AdsScreen from './pages/AdsScreen';
 import Notification from './pages/Notification';
+import Shipments from './pages/Shipment';
+import ShipmentDetailScreen from './pages/Shipment/ShipmentDetailScreen';
+import Chats from './pages/Chats';
+import Messages from './pages/Chats/Messages';
 // import CoStreamScreen from './pages/CoStreamScreen';
 
 const Stack = createNativeStackNavigator();
@@ -35,7 +39,7 @@ export default function App() {
       <PersistGate loading={null} persistor={persistor}>
         <StripeProvider publishableKey="pk_test_51OjJpTASyMRcymO6x2PBK1nrHChycNMNXj7HHvTRffOp5xufCj3WRSCLoep1tGp5Ilx3IWj7ck5yqrwEH8VSRKn80055Kvyelu">
           <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Navigator screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
               <Stack.Screen name="Default" component={DefaultScreen} />
               <Stack.Screen name="Onboarding" component={OnboardingScreen} />
               <Stack.Screen name="Login" component={LoginScreen} />
@@ -55,6 +59,10 @@ export default function App() {
               <Stack.Screen name="Profile" component={ProfileScreen} />
               <Stack.Screen name="Ads" component={AdsScreen} />
               <Stack.Screen name="Notification" component={Notification} />
+              <Stack.Screen name="shipments" component={Shipments} />
+              <Stack.Screen name="shipment_detail" component={ShipmentDetailScreen} />
+              <Stack.Screen name="chats" component={Chats} />
+              <Stack.Screen name="messages" component={Messages} />
               {/* <Stack.Screen name="CoHost" component={CoStreamScreen} /> */}
             </Stack.Navigator>
           </NavigationContainer>

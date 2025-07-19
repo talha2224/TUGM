@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, ImageBackground, Image, StyleSheet, TextInput, TouchableOpacity, ToastAndroid, Keyboard } from 'react-native';
 import Background from '../assets/login-1.png';
 import Logo from '../assets/tugm.png';
@@ -39,6 +39,7 @@ const LoginScreen = () => {
                 }, 2000);
             }
         } catch (error) {
+            console.log(error,'error')
             ToastAndroid.show('Invalid Credentials', ToastAndroid.SHORT);
         }
     };
