@@ -13,7 +13,6 @@ import RegisterScreen from './pages/RegisterScreen';
 import LoaderScreen from './pages/LoaderScreen';
 import HomeScreen from './pages/HomeScreen';
 import CartScreen from './pages/CartScreen';
-// import SingleStreamScreen from './pages/SingleStreamScreen';
 import AuctionListingScreen from './pages/AuctionListingScreen';
 import CreateStreamScreen from './pages/CreateStreamScreen';
 import CalendarScreen from './pages/CalendarScreen';
@@ -29,7 +28,7 @@ import Shipments from './pages/Shipment';
 import ShipmentDetailScreen from './pages/Shipment/ShipmentDetailScreen';
 import Chats from './pages/Chats';
 import Messages from './pages/Chats/Messages';
-// import CoStreamScreen from './pages/CoStreamScreen';
+import FavouriteScreen from './pages/Profile/FavouriteScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -47,7 +46,6 @@ export default function App() {
               <Stack.Screen name="Loader" component={LoaderScreen} />
               <Stack.Screen name="Home" component={HomeScreen} />
               <Stack.Screen name="Cart" component={CartScreen} />
-              {/* <Stack.Screen name="SingleStream" component={SingleStreamScreen} /> */}
               <Stack.Screen name="CreatorStream" component={CreatorStreamScreen} />
               <Stack.Screen name="Categories" component={AuctionListingScreen} />
               <Stack.Screen name="Add" component={CreateStreamScreen} />
@@ -63,7 +61,7 @@ export default function App() {
               <Stack.Screen name="shipment_detail" component={ShipmentDetailScreen} />
               <Stack.Screen name="chats" component={Chats} />
               <Stack.Screen name="messages" component={Messages} />
-              {/* <Stack.Screen name="CoHost" component={CoStreamScreen} /> */}
+              <Stack.Screen name="favourite" component={FavouriteScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </StripeProvider>

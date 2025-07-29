@@ -8,6 +8,7 @@ import AntDesign from 'react-native-vector-icons/AntDesign';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Entypo from 'react-native-vector-icons/Entypo';
+import EvilIcons from 'react-native-vector-icons/EvilIcons';
 import axios from 'axios';
 import config from "../config";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -165,6 +166,13 @@ const ProfileScreen = () => {
                     <Feather name="message-square" size={20} color="white" />
                     <Text style={styles.menuText}>Messages</Text>
                 </TouchableOpacity>
+
+                
+                <TouchableOpacity onPress={() => navigation.navigate('favourite')} style={styles.menuItem}>
+                    <EvilIcons name="heart" size={25} color="white" />
+                    <Text style={styles.menuText}>Favourite</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity onPress={() => navigation.navigate('shipments')} style={styles.menuItem}>
                     <Feather name="truck" size={20} color="white" />
                     <Text style={styles.menuText}>Shipments</Text>
