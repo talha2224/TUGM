@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, Text, TouchableOpacity, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Text, TouchableOpacity, Pressable, Modal } from 'react-native';
 import BottomNavBar from '../components/BottomNav';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -7,49 +7,9 @@ import { GestureHandlerRootView, TextInput } from 'react-native-gesture-handler'
 import { useNavigation } from '@react-navigation/core';
 import config from '../config';
 import axios from 'axios';
-
-const auctionData = [
-    {
-        name: 'sam',
-        image: "https://randomuser.me/api/portraits/men/10.jpg",
-        date: 'Dec 26, 2024 07:52',
-    },
-    {
-        name: 'james',
-        image: "https://randomuser.me/api/portraits/women/11.jpg",
-        date: 'Dec 26, 2024 08:50',
-    },
-    {
-        name: 'c',
-        image: "https://randomuser.me/api/portraits/men/12.jpg",
-        date: 'Dec 28, 2024 09:10',
-    },
-    {
-        name: 'ali',
-        image: "https://randomuser.me/api/portraits/men/13.jpg",
-        date: 'Dec 29, 2024 10:10',
-    },
-    {
-        name: 'sam',
-        image: "https://randomuser.me/api/portraits/men/10.jpg",
-        date: 'Dec 26, 2024 07:52',
-    },
-    {
-        name: 'james',
-        image: "https://randomuser.me/api/portraits/women/11.jpg",
-        date: 'Dec 26, 2024 08:50',
-    },
-    {
-        name: 'c',
-        image: "https://randomuser.me/api/portraits/men/12.jpg",
-        date: 'Dec 28, 2024 09:10',
-    },
-    {
-        name: 'ali',
-        image: "https://randomuser.me/api/portraits/men/13.jpg",
-        date: 'Dec 29, 2024 10:10',
-    },
-];
+// Import icons for the modal
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import AntDesign from 'react-native-vector-icons/AntDesign';
 
 
 const CalendarScreen = () => {
@@ -57,7 +17,8 @@ const CalendarScreen = () => {
     const [searchText, setSearchText] = useState("");
     const [activeTab] = useState('Auctions');
     const [streams, setStreams] = useState([]);
-    const filteredAuctions = auctionData.filter(stream => stream.name.toLowerCase().includes(searchText.toLowerCase()));
+    // State to control modal visibility
+    const [isModalVisible, setIsModalVisible] = useState(false);
 
     const fetchLiveStreams = async () => {
         try {
@@ -73,13 +34,23 @@ const CalendarScreen = () => {
 
     useEffect(() => { fetchLiveStreams(); }, []);
 
+    // Function to handle opening the modal
+    const handleSeeMorePress = () => {
+        setIsModalVisible(true);
+    };
+
+    // Dummy function for modal item presses
+    const handleModalItemPress = (action) => {
+        setIsModalVisible(false);
+        navigation.navigate("competitions/settings")
+    };
+
     return (
         <GestureHandlerRootView style={styles.container}>
 
-
             <ScrollView showsVerticalScrollIndicator={false}>
 
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 50 }}>
                     <Text style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>TUGM</Text>
                     <Pressable onPress={() => { navigation.navigate("Cart") }} style={{ flexDirection: "row", alignItems: "center" }}>
                         <Feather name="shopping-cart" size={24} color="white" />
@@ -88,7 +59,15 @@ const CalendarScreen = () => {
 
                 <View style={styles.btnContainer}>
                     <TouchableOpacity style={[styles.tabButton, activeTab === 'Auctions' && styles.activeTab]} onPress={() => handleTabPress('Auctions')}>
-                        <Text style={[styles.tabText, activeTab !== 'Auctions' ? styles.inActiveTabText : styles?.activeTab]}>Events</Text>
+                        <Text style={[styles.tabText, styles?.activeTab]}>Events</Text>
+                    </TouchableOpacity>
+
+                    {/* Updated TouchableOpacity for See More */}
+                    <TouchableOpacity
+                        style={{ backgroundColor: "#F78E1B", justifyContent: "center", alignItems: "center", paddingHorizontal: 10, borderRadius: 5 }}
+                        onPress={handleSeeMorePress}
+                    >
+                        <Text style={{ color: "#fff" }}>See More</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -106,11 +85,11 @@ const CalendarScreen = () => {
                     streams?.length > 0 ?
                         <View style={styles.cardList}>
                             {streams?.map((stream, index) => (
-                                <TouchableOpacity onPress={() => { navigation.navigate("CreatorStream", { streamId: stream?.streamId,isHost:false }) }} key={index} style={styles.card}>
+                                <TouchableOpacity onPress={() => { navigation.navigate("CreatorStream", { streamId: stream?.streamId, isHost: false }) }} key={index} style={styles.card}>
                                     <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage }} style={styles.cardImage} blurRadius={4} />
                                     <View style={styles.cardOverlay}>
                                         <View style={styles.profileContainer}>
-                                            <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage  }} style={styles.profileImage} />
+                                            <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage }} style={styles.profileImage} />
                                             <Text style={styles.profileName}>{stream?.creatorId?.username}</Text>
                                         </View>
                                         <Text style={styles.upcomingText}>Live</Text>
@@ -125,7 +104,32 @@ const CalendarScreen = () => {
 
             </ScrollView>
 
-
+            {/* The Bottom Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isModalVisible}
+                onRequestClose={() => {
+                    setIsModalVisible(!isModalVisible);
+                }}
+            >
+                <Pressable style={styles.modalBackground} onPress={() => setIsModalVisible(false)}>
+                    <Pressable style={styles.modalView}>
+                        <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Live Auction')}>
+                            <AntDesign name="camera" size={17} color="#fff" style={styles.modalIcon} />
+                            <Text style={styles.modalText}>LIVE Auction</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Live Competition')}>
+                            <MaterialCommunityIcons name="trophy-variant-outline" size={17} color="#fff" style={styles.modalIcon} />
+                            <Text style={styles.modalText}>LIVE Competition</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Schedule a show')}>
+                            <Ionicons name="play-circle-outline" size={17} color="#fff" style={styles.modalIcon} />
+                            <Text style={styles.modalText}>Schedule a show</Text>
+                        </TouchableOpacity>
+                    </Pressable>
+                </Pressable>
+            </Modal>
 
             <BottomNavBar />
         </GestureHandlerRootView>
@@ -138,6 +142,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
         paddingTop: 20
     },
+    // ... (rest of your existing styles) ...
     catContainer: {
         backgroundColor: '#000',
         padding: 20,
@@ -159,16 +164,14 @@ const styles = StyleSheet.create({
     },
     btnContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
+        paddingHorizontal: 10,
         marginTop: 20,
+        justifyContent: "space-between"
     },
     tabButton: {
         paddingHorizontal: 10,
         paddingVertical: 5,
         marginRight: 20,
-    },
-    activeTab: {
-        color: "#F78E1B"
     },
     tabText: {
         fontSize: 16,
@@ -212,7 +215,32 @@ const styles = StyleSheet.create({
         color: 'gray',
         fontSize: 12,
     },
-
+    // Styles for the new modal
+    modalBackground: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end', // Aligns modal to the bottom
+    },
+    modalView: {
+        backgroundColor: '#151515',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        alignItems: 'flex-start', // Align items to the left
+    },
+    modalItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        paddingVertical: 15,
+    },
+    modalIcon: {
+        marginRight: 15,
+    },
+    modalText: {
+        color: '#fff',
+        fontSize: 14,
+    },
 });
 
 export default CalendarScreen;

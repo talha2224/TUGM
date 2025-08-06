@@ -29,6 +29,8 @@ import ShipmentDetailScreen from './pages/Shipment/ShipmentDetailScreen';
 import Chats from './pages/Chats';
 import Messages from './pages/Chats/Messages';
 import FavouriteScreen from './pages/Profile/FavouriteScreen';
+import CompetitionsSettings from './pages/Competition';
+import Competition from './pages/Competition/Competition';
 
 const Stack = createNativeStackNavigator();
 
@@ -62,6 +64,8 @@ export default function App() {
               <Stack.Screen name="chats" component={Chats} />
               <Stack.Screen name="messages" component={Messages} />
               <Stack.Screen name="favourite" component={FavouriteScreen} />
+              <Stack.Screen name="competitions/settings" component={CompetitionsSettings} />
+              <Stack.Screen name="competition" component={Competition} />
             </Stack.Navigator>
           </NavigationContainer>
         </StripeProvider>
