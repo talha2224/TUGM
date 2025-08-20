@@ -17,6 +17,9 @@ import Feather from 'react-native-vector-icons/Feather';
 import Entypo from 'react-native-vector-icons/Entypo';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5'; // Import FontAwesome5 for specific icons
 import { useNavigation } from '@react-navigation/core';
+import axios from 'axios';
+import config from '../config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const productSizesOptions = ['XS', 'S', 'M', 'L', 'XL', 'M Tall', 'L Tall', 'XL Tall', 'XXL'];
 const productColorsOptions = ['Red', 'Yellow', 'Orange', 'Pink', 'White', 'Black', 'Brown', 'Magenta', 'Purple'];
@@ -25,7 +28,7 @@ const shippingOptions = ['Pickup Available', 'State-wide Delivery Available', 'N
 
 const CreateProductScreen = () => {
     const navigation = useNavigation();
-
+    const [price, setPrice] = useState('');
     const [currentStep, setCurrentStep] = useState(1);
     const [productImages, setProductImages] = useState([]);
     const [selectedListing, setSelectedListing] = useState('');
@@ -48,7 +51,6 @@ const CreateProductScreen = () => {
     const [isStep2Valid, setIsStep2Valid] = useState(false);
 
 
-    // Update validation for Step 1
     React.useEffect(() => {
         setIsStep1Valid(
             productImages.length > 0 &&
@@ -57,7 +59,6 @@ const CreateProductScreen = () => {
         );
     }, [productImages, selectedListing, selectedProductSizes]);
 
-    // Update validation for Step 2
     React.useEffect(() => {
         setIsStep2Valid(
             productTitle.trim().length > 0 &&
@@ -134,55 +135,53 @@ const CreateProductScreen = () => {
         setCurrentStep(prevStep => prevStep + 1);
     };
 
-    const handlePublish = () => {
-        // Full validation for step 3 before publishing
-        if (categories.length === 0) {
-            ToastAndroid.show('Please add at least one category.', ToastAndroid.SHORT);
-            return;
-        }
-        if (searchTags.length === 0) {
-            ToastAndroid.show('Please add at least one search tag.', ToastAndroid.SHORT);
-            return;
-        }
-        if (!minimumQuantity.trim() || isNaN(minimumQuantity) || parseInt(minimumQuantity) <= 0) {
-            ToastAndroid.show('Please enter a valid minimum quantity.', ToastAndroid.SHORT);
-            return;
-        }
-        if (!weight.trim()) {
-            ToastAndroid.show('Please enter the weight.', ToastAndroid.SHORT);
-            return;
-        }
-        if (!dimension.trim()) {
-            ToastAndroid.show('Please enter the dimension.', ToastAndroid.SHORT);
-            return;
-        }
-        if (!shippingOption) {
-            ToastAndroid.show('Please select a shipping option.', ToastAndroid.SHORT);
-            return;
-        }
-        if (selectedColors.length === 0) {
-            ToastAndroid.show('Please select at least one product color.', ToastAndroid.SHORT);
-            return;
-        }
+    const handlePublish = async () => {
+        try {
+            const userId = await AsyncStorage.getItem("userId");
 
-        const productData = {
-            images: productImages,
-            listing: selectedListing,
-            sizes: selectedProductSizes,
-            title: productTitle,
-            description: productDescription,
-            categories: categories,
-            searchTags: searchTags,
-            minimumQuantity: parseInt(minimumQuantity),
-            weight: weight,
-            dimension: dimension,
-            shipping: shippingOption,
-            colors: selectedColors,
-        };
-        console.log("Product Data:", productData);
-        ToastAndroid.show('Product Published!', ToastAndroid.SHORT);
-        navigation.goBack();
+            const formData = new FormData();
+
+            // append text fields
+            formData.append("userId", userId);
+            formData.append("title", productTitle);
+            formData.append("size", selectedProductSizes);
+            formData.append("description", productDescription);
+            formData.append("listing_type", selectedListing);
+            formData.append("shipping_type", shippingOption);
+            formData.append("categories", JSON.stringify(categories));
+            formData.append("tags", JSON.stringify(searchTags));
+            formData.append("colors", JSON.stringify(selectedColors));
+            formData.append("weight", weight);
+            formData.append("dimensions", dimension);
+            formData.append("quantity", minimumQuantity);
+            formData.append("price", price);
+            formData.append("stock", selectedListing === "Out Of Stock" ? 0 : 1);
+
+            // append multiple images
+            productImages.forEach((uri, index) => {
+                formData.append("images", {
+                    uri,
+                    type: "image/jpeg",
+                    name: `product_${index}.jpg`
+                });
+            });
+
+            const response = await axios.post(`${config.baseUrl}/product/create`, formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+
+            if (response.status === 200) {
+                ToastAndroid.show("Product Published!", ToastAndroid.SHORT);
+                navigation.goBack();
+            }
+        } catch (error) {
+            console.log("Create product error:", error.response?.data || error.message);
+            ToastAndroid.show("Failed to publish product", ToastAndroid.SHORT);
+        }
     };
+
 
     const renderBottomModal = (isVisible, options, onSelect, selectedValue, type) => (
         <Modal
@@ -201,24 +200,14 @@ const CreateProductScreen = () => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         {options.map((option, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.modalOption}
-                                onPress={() => {
-                                    onSelect(option);
-                                    if (type === 'listing') setListingModalVisible(false);
-                                    else if (type === 'shipping') setShippingModalVisible(false);
-                                }}
-                            >
+                            <TouchableOpacity key={index} style={styles.modalOption} onPress={() => { onSelect(option); if (type === 'listing') setListingModalVisible(false); else if (type === 'shipping') setShippingModalVisible(false); }}>
+                                <Text style={styles.modalOptionText}>{option}</Text>
+                                {type === 'listing' && selectedValue === option && (<FontAwesome5 name="check" size={15} color="#FFA500" />)}
                                 {type === 'shipping' ? (
                                     <View style={styles.radioCircle}>
                                         {selectedValue === option && <View style={styles.selectedRadioFill} />}
                                     </View>
                                 ) : null}
-                                <Text style={styles.modalOptionText}>{option}</Text>
-                                {type === 'listing' && selectedValue === option && (
-                                    <FontAwesome5 name="check" size={15} color="#FFA500" />
-                                )}
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -226,7 +215,6 @@ const CreateProductScreen = () => {
             </TouchableWithoutFeedback>
         </Modal>
     );
-
 
     return (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
@@ -477,6 +465,9 @@ const CreateProductScreen = () => {
                             </TouchableOpacity>
                         ))}
                     </View>
+
+                    <Text style={styles.sectionTitle}>Price</Text>
+                    <TextInput style={styles.textInput} placeholder="100" placeholderTextColor="#666" keyboardType="numeric" value={price} onChangeText={setPrice} />
                 </View>
             )}
 
@@ -498,7 +489,6 @@ const CreateProductScreen = () => {
                 <TouchableOpacity
                     style={[
                         styles.bottomButton,
-                        // Add validation for Step 3 fields here
                         !(categories.length > 0 && searchTags.length > 0 && minimumQuantity.trim() && weight.trim() && dimension.trim() && shippingOption && selectedColors.length > 0) ? styles.buttonDisabled : styles.buttonEnabled
                     ]}
                     onPress={handlePublish}

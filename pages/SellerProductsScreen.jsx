@@ -14,9 +14,6 @@ const SellerProductsScreen = () => {
     const [activeCategory, setActiveCategory] = useState('');
     const [categories, setCategories] = useState([])
     const [products, setProducts] = useState([])
-
-
-    const togglePopup = () => { setIsPopupVisible(!isPopupVisible); }
     const handleCategoryPress = (category) => { setActiveCategory(category); };
 
     const fetchCategory = async () => {
@@ -43,19 +40,19 @@ const SellerProductsScreen = () => {
             console.log(error)
         }
     }
-
-
     useEffect(() => {
         fetchCategory();
         fetchProduct()
     }, []);
+
+    // console.log(products, 'productss')
     return (
         <View style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
 
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20, }}>
                     <Text style={styles.headerText}>My Store</Text>
-                    <TouchableOpacity onPress={()=>navigation.navigate("CreateProduct")}>
+                    <TouchableOpacity onPress={() => navigation.navigate("CreateProduct")}>
                         <AntDesign name="plus" size={20} color="#ffff" />
                     </TouchableOpacity>
                 </View>
@@ -76,11 +73,11 @@ const SellerProductsScreen = () => {
                 <View>
                     {
                         products?.map((i) => (
-                            <View key={i?._id} style={{ padding: 10, backgroundColor: '#1A1A1A', borderRadius: 10, marginVertical: 10, }}>
+                            <TouchableOpacity onPress={() => navigation.navigate("single_product", { productId: i._id })} key={i?._id} style={{ padding: 10, backgroundColor: '#1A1A1A', borderRadius: 10, marginVertical: 10, }}>
 
                                 <View style={{ flexDirection: "row", alignItems: "flex-start", borderBottomWidth: 2, borderBottomColor: "#494848", paddingBottom: 20 }}>
 
-                                    <Image source={{ uri: i.image }} alt='img' style={{ width: 70, height: 70, borderRadius: 10 }} />
+                                    <Image source={{ uri: i.images[0] }} alt='img' style={{ width: 70, height: 70, borderRadius: 10 }} />
                                     <View style={{ marginLeft: 10 }}>
                                         <Text style={{ color: "#fff", fontSize: 12 }}>{i.name}</Text>
                                         <Text style={{ color: "#c4c4c4", fontSize: 12, marginTop: 8 }}>QTY: {i?.stock}</Text>
@@ -100,7 +97,7 @@ const SellerProductsScreen = () => {
                                     </TouchableOpacity>
                                 </View>
 
-                            </View>
+                            </TouchableOpacity>
                         ))
                     }
                 </View>

@@ -17,7 +17,7 @@ import AuctionListingScreen from './pages/AuctionListingScreen';
 import CreateStreamScreen from './pages/CreateStreamScreen';
 import CalendarScreen from './pages/CalendarScreen';
 import ProfileScreen from './pages/ProfileScreen';
-import MyOrdersScreen from './pages/MyOrdersScreen';
+import MyOrdersScreen from './pages/MyOrdersScreen_Old';
 import SellerOrdersScreen from './pages/SellerOrdersScreen';
 import SellerProductsScreen from './pages/SellerProductsScreen';
 import CreateProductScreen from './pages/CreateProductScreen';
@@ -31,6 +31,13 @@ import Messages from './pages/Chats/Messages';
 import FavouriteScreen from './pages/Profile/FavouriteScreen';
 import CompetitionsSettings from './pages/Competition';
 import Competition from './pages/Competition/Competition';
+import SingleProductPage from './pages/SingleProductPage';
+import CheckoutScreen from './pages/CheckoutScreen';
+import BuyerOrderScreen from './pages/BuyerOrderScreen';
+import OrderTrackingScreen from './pages/OrderTrackingScreen';
+import RatingScreen from './pages/RatingScreen';
+import SupportScreen from './pages/Support/SupportScreen';
+import LiveSupportScreen from './pages/Support/LiveSupportScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -52,7 +59,7 @@ export default function App() {
               <Stack.Screen name="Categories" component={AuctionListingScreen} />
               <Stack.Screen name="Add" component={CreateStreamScreen} />
               <Stack.Screen name="Calendar" component={CalendarScreen} />
-              <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
+              <Stack.Screen name="MyOrders" component={BuyerOrderScreen} />
               <Stack.Screen name="SellerProducts" component={SellerProductsScreen} />
               <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} />
               <Stack.Screen name="CreateProduct" component={CreateProductScreen} />
@@ -66,6 +73,12 @@ export default function App() {
               <Stack.Screen name="favourite" component={FavouriteScreen} />
               <Stack.Screen name="competitions/settings" component={CompetitionsSettings} />
               <Stack.Screen name="competition" component={Competition} />
+              <Stack.Screen name="single_product" component={SingleProductPage} />
+              <Stack.Screen name="checkout" component={CheckoutScreen} />
+              <Stack.Screen name="order_tracking" component={OrderTrackingScreen} />
+              <Stack.Screen name="order_review" component={RatingScreen} />
+              <Stack.Screen name="support" component={SupportScreen} />
+              <Stack.Screen name="live_support" component={LiveSupportScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </StripeProvider>

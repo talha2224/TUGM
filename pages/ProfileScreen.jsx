@@ -167,6 +167,11 @@ const ProfileScreen = () => {
                     <Text style={styles.menuText}>Messages</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity onPress={() => navigation.navigate('support')} style={styles.menuItem}>
+                    <Entypo name="help-with-circle" size={20} color="white" />
+                    <Text style={styles.menuText}>Support</Text>
+                </TouchableOpacity>
+
                 
                 <TouchableOpacity onPress={() => navigation.navigate('favourite')} style={styles.menuItem}>
                     <EvilIcons name="heart" size={25} color="white" />

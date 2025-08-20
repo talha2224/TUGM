@@ -62,9 +62,9 @@ const HomeScreen = () => {
         try {
             let res = await axios.get(`${config.baseUrl}/product/all`);
             if (res?.data) {
-                const filtered = res.data.data.filter(product => product.categoryId.category === "Jacket");
+                // const filtered = res.data.data.filter(product => product.categoryId.category === "Jacket");
                 setProducts(res?.data?.data);
-                setFilterProducts(filtered);
+                // setFilterProducts(filtered);
             }
         }
         catch (error) {
@@ -274,8 +274,6 @@ const HomeScreen = () => {
 
     };
 
-
-
     return (
         <View style={styles.container}>
 
@@ -350,12 +348,12 @@ const HomeScreen = () => {
                 </ScrollView>
 
                 <View style={styles.productList}>
-                    {filterproducts?.map((product) => (
-                        <View key={product._id} style={styles.card}>
+                    {products?.map((product) => (
+                        <TouchableOpacity onPress={() => navigation.navigate("single_product", { productId: product._id })}  key={product._id} style={styles.card}>
                             <TouchableOpacity style={styles.cartButton} onPress={() => handleAddToCard(product)}>
                                 <AntDesign name="plus" size={20} color="white" />
                             </TouchableOpacity>
-                            <Image source={{ uri: product.image }} style={styles.productImage} />
+                            <Image source={{ uri: product.images[0] }} style={styles.productImage} />
                             <View style={styles.productInfo}>
                                 <Text style={styles.productName}>{product?.title}</Text>
                                 <View style={styles.ratingContainer}>
@@ -364,7 +362,7 @@ const HomeScreen = () => {
                                 </View>
                                 <Text style={styles.price}>${product.price.toFixed(2)}</Text>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </View>
 
