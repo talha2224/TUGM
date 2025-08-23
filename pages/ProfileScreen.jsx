@@ -18,7 +18,8 @@ import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-nati
 const ProfileScreen = () => {
     const navigation = useNavigation();
     const [data, setData] = useState({});
-    const [image, setImage] = useState("https://randomuser.me/api/portraits/men/8.jpg");
+    const [image, setImage] = useState("");
+    // const [image, setImage] = useState("https://randomuser.me/api/portraits/men/8.jpg");
     const [sellerMode, setSellerMode] = useState(false);
 
     const menuItems = [

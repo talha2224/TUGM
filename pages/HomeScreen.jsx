@@ -282,7 +282,7 @@ const HomeScreen = () => {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20 }}>
                     <Text style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>TUGM</Text>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Pressable style={{marginRight:10}} onPress={() => { navigation.navigate("Notification") }}>
+                        <Pressable style={{ marginRight: 10 }} onPress={() => { navigation.navigate("Notification") }}>
                             <Ionicons name="notifications" size={24} color="white" />
                         </Pressable>
                         <Pressable onPress={() => { navigation.navigate("Cart") }}>
@@ -294,14 +294,14 @@ const HomeScreen = () => {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyContainer}>
                     <Pressable onPress={() => setcreateStoryModel(!createStoryModel)} style={styles.storyItem}>
                         <View style={[styles.imageContainer]}>
-                            <Image source={{ uri: profileData?.profile ? profileData?.profile : "https://randomuser.me/api/portraits/women/2.jpg" }} style={styles.storyImage} />
+                            <Image source={{ uri: profileData?.profile }} style={styles.storyImage} />
                         </View>
                         <Text style={{ color: '#C4C4C4', marginTop: 5 }}>Upload Story</Text>
                     </Pressable>
                     {stories.map((user, index) => (
                         <Pressable onPress={() => setViewStoryModel(!viewStoryModel)} key={index} style={styles.storyItem}>
                             <View style={[styles.imageContainer, index == 0 && styles.activeStoryBorder]}>
-                                <Image source={{ uri: user?.userId?.profile ? user?.userId?.profile : "https://randomuser.me/api/portraits/women/2.jpg" }} style={styles.storyImage} />
+                                <Image source={{ uri: user?.userId?.profile }} style={styles.storyImage} />
                             </View>
                             <Text numberOfLines={1} lineBreakMode='tail' style={styles.storyText}>{user?.userId?.username}</Text>
                         </Pressable>
@@ -310,7 +310,7 @@ const HomeScreen = () => {
 
                 {
                     streams?.length > 0 && (
-                        <TouchableOpacity onPress={() => { navigation.navigate("CreatorStream", { streamId: streams[0]?.streamId,isHost:false }) }} style={styles.liveContainer}>
+                        <TouchableOpacity onPress={() => { navigation.navigate("CreatorStream", { streamId: streams[0]?.streamId, isHost: false }) }} style={styles.liveContainer}>
                             <Image source={{ uri: streams[0]?.coverImage }} style={styles.liveImage} />
                             <View style={styles.liveInfo}>
                                 <View style={styles.liveUserInfo}>
@@ -349,7 +349,7 @@ const HomeScreen = () => {
 
                 <View style={styles.productList}>
                     {products?.map((product) => (
-                        <TouchableOpacity onPress={() => navigation.navigate("single_product", { productId: product._id })}  key={product._id} style={styles.card}>
+                        <TouchableOpacity onPress={() => navigation.navigate("single_product", { productId: product._id })} key={product._id} style={styles.card}>
                             <TouchableOpacity style={styles.cartButton} onPress={() => handleAddToCard(product)}>
                                 <AntDesign name="plus" size={20} color="white" />
                             </TouchableOpacity>
@@ -409,7 +409,7 @@ const HomeScreen = () => {
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start', }}>
                                 <View style={{ flexDirection: 'row', alignItems: "center", gap: 10 }}>
                                     <TouchableOpacity onPress={() => setViewStoryModel(false)}><Ionicons name="arrow-back-outline" size={20} color="#FFFFFF" /></TouchableOpacity>
-                                    <Image source={{ uri: currentStory.userId.profile || "https://randomuser.me/api/portraits/women/2.jpg" }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 10, borderColor: "orange", borderWidth: 1 }} />
+                                    <Image source={{ uri: currentStory.userId.profile }} style={{ width: 50, height: 50, borderRadius: 25, marginRight: 10, borderColor: "orange", borderWidth: 1 }} />
                                 </View>
                                 <View>
                                     <Text style={{ color: 'white', fontSize: 16 }}>{currentStory.userId.username || "None"}</Text>
@@ -457,7 +457,7 @@ const HomeScreen = () => {
                                             <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10, paddingHorizontal: 10 }}>
                                                 {currentStory.viewers.map((viewer, index) => (
                                                     <View key={index} style={{ alignItems: "flex-start", marginRight: 15, flexDirection: "row", gap: 9 }}>
-                                                        <Image source={{ uri: viewer.profile || "https://randomuser.me/api/portraits/women/2.jpg" }} style={{ width: 40, height: 40, borderRadius: 20, borderColor: "#9D9D9D", borderWidth: 1 }} />
+                                                        <Image source={{ uri: viewer.profile }} style={{ width: 40, height: 40, borderRadius: 20, borderColor: "#9D9D9D", borderWidth: 1 }} />
                                                         <Text style={{ color: '#000000', fontSize: 12, marginTop: 5 }}>{viewer.username || "Unknown"}</Text>
                                                     </View>
                                                 ))}
