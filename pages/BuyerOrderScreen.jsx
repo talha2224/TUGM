@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/core';
 import Entypo from 'react-native-vector-icons/Entypo';
 import product_img from "../assets/product/main.png";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import config from '../config';
 
 const orderData = [
     { id: '1', product: 'Zip-up hoody', status: 'Ongoing', price: '30.00', image: product_img, type: 'Clothing' },
@@ -13,10 +16,24 @@ const orderData = [
 ];
 
 const BuyerOrderScreen = () => {
-    const navigation = useNavigation();
+    const [orders, setOrders] = useState([])
     const [activeTab, setActiveTab] = useState('All');
+    const navigation = useNavigation();
 
-    const filteredOrders = orderData.filter(order => {
+    const fetchProduct = async () => {
+        let userId = await AsyncStorage.getItem('userId');
+        try {
+            let res = await axios.get(`${config.baseUrl}/order/user/${userId}`)
+            if (res?.data) {
+                setOrders(res?.data?.data);
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    }
+
+    const filteredOrders = orders.filter(order => {
         if (activeTab === 'All') {
             return true;
         }
@@ -25,13 +42,13 @@ const BuyerOrderScreen = () => {
 
     const renderOrderStatus = (status, date) => {
         switch (status) {
-            case 'Ongoing':
+            case 'ongoing':
                 return (
                     <View style={[styles.statusTag, styles.ongoingTag]}>
                         <Text style={styles.statusText}>Ongoing</Text>
                     </View>
                 );
-            case 'Delivered':
+            case 'delivered':
                 return (
                     <View style={styles.statusContainer}>
                         <View style={[styles.statusTag, styles.deliveredTag]}>
@@ -43,7 +60,7 @@ const BuyerOrderScreen = () => {
                         </TouchableOpacity>
                     </View>
                 );
-            case 'Canceled':
+            case 'cancelled':
                 return (
                     <View style={[styles.statusTag, styles.canceledTag]}>
                         <Text style={styles.statusText}>Canceled</Text>
@@ -53,6 +70,10 @@ const BuyerOrderScreen = () => {
                 return null;
         }
     };
+    
+    useEffect(() => {
+        fetchProduct()
+    }, []);
 
     return (
         <View style={styles.container}>
@@ -64,7 +85,7 @@ const BuyerOrderScreen = () => {
                 <View style={styles.placeholder} />
             </View>
             <View style={styles.tabContainer}>
-                {['All', 'Delivered', 'Ongoing', 'Canceled'].map(tab => (
+                {['All', 'delivered', 'ongoing', 'cancelled'].map(tab => (
                     <TouchableOpacity
                         key={tab}
                         style={[styles.tabButton, activeTab === tab && styles.activeTab]}
@@ -76,18 +97,18 @@ const BuyerOrderScreen = () => {
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollViewContent}>
                 {filteredOrders.map(order => (
-                    <TouchableOpacity onPress={()=>navigation.navigate("order_tracking")} key={order.id} style={styles.orderCard}>
-                        <Image source={order.image} style={styles.productImage} />
+                    <TouchableOpacity onPress={() => navigation.navigate("order_tracking")} key={order.id} style={styles.orderCard}>
+                        <Image source={{uri:order?.productId?.images[0]}} style={styles.productImage} />
                         <View style={styles.orderDetails}>
-                            <Text style={styles.productType}>{order.type}</Text>
-                            <Text style={styles.productName}>{order.product}</Text>
-                            {order.status === 'Ongoing' && renderOrderStatus(order.status)}
-                            {order.status === 'Canceled' && renderOrderStatus(order.status)}
-                            {order.status === 'Delivered' && renderOrderStatus(order.status, order.date)}
+                            <Text style={styles.productType}>{order?.productId?.categories[0]}</Text>
+                            <Text style={styles.productName}>{order?.productId?.title}</Text>
+                            {order.status === 'ongoing' && renderOrderStatus(order.status)}
+                            {order.status === 'cancelled' && renderOrderStatus(order.status)}
+                            {order.status === 'delivered' && renderOrderStatus(order.status, order.date)}
                         </View>
                         <View style={styles.priceContainer}>
-                            <Text style={styles.priceItems}>1 Items</Text>
-                            <Text style={styles.priceText}>${order.price}</Text>
+                            <Text style={styles.priceItems}>{order?.quantity} Items</Text>
+                            <Text style={styles.priceText}>${order?.total}</Text>
                         </View>
                     </TouchableOpacity>
                 ))}
@@ -120,15 +141,14 @@ const styles = StyleSheet.create({
     },
     tabContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
         paddingHorizontal: 10,
         marginBottom: 20,
     },
     tabButton: {
-        flex: 1,
         alignItems: 'center',
         paddingVertical: 10,
-        marginHorizontal: 5,
+        width:80,
+        marginHorizontal:5,
         backgroundColor: '#252525',
         borderRadius: 50,
     },
@@ -136,7 +156,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#F28C28',
     },
     tabText: {
-        color: 'white'
+        color: 'white',
+        textTransform:"capitalize"
     },
     activeTabText: {
         color: 'white',

@@ -1,35 +1,36 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image, Modal, Pressable, Dimensions, TextInput } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image, Modal, Pressable, Dimensions, TextInput, ToastAndroid } from 'react-native';
 import { useNavigation } from '@react-navigation/core';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Entypo from 'react-native-vector-icons/Entypo';
-import product_img from "../assets/product/main.png";
 import map_img from "../assets/product/map.png";
-import paypal_img from "../assets/product/paypal.png";
 import visa_img from "../assets/product/visa.png";
+import { useDispatch, useSelector } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import config from '../config';
+import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
+import { clearCart } from '../redux/cartSlice';
 
 const steps = ["Shipping", "Payment", "Review"];
 
 const CheckoutScreen = () => {
+    const dispatch = useDispatch();
+    const products = useSelector(state => state.cart.cartItems);
+
     const navigation = useNavigation();
     const [currentStep, setCurrentStep] = useState(0);
     const [isAddressModalVisible, setAddressModalVisible] = useState(false);
     const [isPickupModalVisible, setPickupModalVisible] = useState(false);
-    const [selectedAddress, setSelectedAddress] = useState(null);
-    const [selectedPickupStation, setSelectedPickupStation] = useState(null);
+    const [customer_address, setCustomer_address] = useState("");
+    const [pickup_station, Setpickup_station] = useState("")
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    const products = [
-        { name: "Zip-up hoody", price: 30.00, color: "Yellow", category: "Clothing", quantity: 1, shipping: "USPS Ground Advantage...39320229" }
-    ];
+    const total = products.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-    const subtotal = products.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    const deliveryFees = 7.50;
-    const total = subtotal + deliveryFees;
-
-    const handleNext = () => {
-        if (currentStep === 0 && !selectedAddress) {
+    const handleNext = async () => {
+        if (currentStep === 0 && !customer_address) {
             alert("Please add a customer address.");
             return;
         }
@@ -40,7 +41,35 @@ const CheckoutScreen = () => {
         if (currentStep < steps.length - 1) {
             setCurrentStep(currentStep + 1);
         } else {
-            setShowSuccessModal(true);
+            let userId = await AsyncStorage.getItem('userId');
+            let paymentIntentRes = await axios.post(`${config.baseUrl}/payment/create-intent`, { amount: total * 100, currency: "usd" });
+            if (!paymentIntentRes?.data?.clientSecret) {
+                throw new Error("Failed to fetch payment intent");
+            }
+            let clientSecret = paymentIntentRes?.data?.clientSecret
+            if (clientSecret) {
+                const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
+                if (initResponse.error) {
+                    Alert.alert(initResponse?.error?.message)
+                    return
+                }
+                else {
+                    const paymentResponse = await presentPaymentSheet()
+                    if (paymentResponse.error) {
+                        Alert.alert(paymentResponse?.error?.message)
+                        return
+                    }
+                    else {
+                        let res = await axios.post(`${config.baseUrl}/order/checkout`, { userId, pickup_station, customer_address, product: products });
+                        if (res?.data) {
+                            ToastAndroid.show('Order Placed!', ToastAndroid.SHORT);
+                            dispatch(clearCart());
+                            setShowSuccessModal(true);
+                        }
+                    }
+                }
+
+            }
         }
     };
 
@@ -76,10 +105,9 @@ const CheckoutScreen = () => {
                         <Text style={styles.linkText}>Add</Text>
                     </TouchableOpacity>
                 </View>
-                {selectedAddress && (
+                {customer_address && (
                     <View style={styles.addressCard}>
-                        <Text style={styles.addressText}>{selectedAddress.name} | {selectedAddress.phone}</Text>
-                        <Text style={styles.addressText}>{selectedAddress.street}</Text>
+                        <Text style={styles.addressText}>{customer_address}</Text>
                     </View>
                 )}
             </View>
@@ -90,10 +118,9 @@ const CheckoutScreen = () => {
                         <Text style={styles.linkText}>Add</Text>
                     </TouchableOpacity>
                 </View>
-                {selectedPickupStation && (
+                {pickup_station && (
                     <View style={styles.pickupCard}>
-                        <Text style={styles.pickupTitle}>{selectedPickupStation.name}</Text>
-                        <Text style={styles.pickupAddress}>{selectedPickupStation.address}</Text>
+                        <Text style={styles.pickupTitle}>{pickup_station}</Text>
                     </View>
                 )}
             </View>
@@ -103,20 +130,24 @@ const CheckoutScreen = () => {
                     <Text style={styles.shipmentDetails}>Fulfilled by TUGM</Text>
                 </View>
                 <Text style={styles.deliveryDate}>Delivery Between 15 Jun and 17 Jun</Text>
-                {selectedAddress && <Text style={styles.shippingMethod}>{selectedAddress.shipping}</Text>}
+                {customer_address && <Text style={styles.shippingMethod}>{customer_address}</Text>}
             </View>
-            <View style={styles.productSummaryCard}>
-                <Image source={product_img} style={styles.productImage} />
-                <View style={styles.productSummaryDetails}>
-                    <Text style={styles.productSummaryCategory}>Clothing</Text>
-                    <Text style={styles.productSummaryName}>Zip-up hoody</Text>
-                    <Text style={styles.productSummaryColor}>Color - Yellow</Text>
-                </View>
-                <View style={styles.productSummaryPrice}>
-                    <Text style={styles.productSummaryItems}>1 items</Text>
-                    <Text style={styles.productSummaryAmount}>${subtotal.toFixed(2)}</Text>
-                </View>
-            </View>
+            {
+                products.map((i) => (
+                    <View key={i?._id} style={styles.productSummaryCard}>
+                        <Image source={{ uri: i?.images[0] }} style={styles.productImage} />
+                        <View style={styles.productSummaryDetails}>
+                            <Text style={styles.productSummaryCategory}>{i?.categories[0]}</Text>
+                            <Text style={styles.productSummaryName}>{i?.title}</Text>
+                            <Text style={styles.productSummaryColor}>Color - {i?.colors[1]}</Text>
+                        </View>
+                        <View style={styles.productSummaryPrice}>
+                            <Text style={styles.productSummaryItems}>{i?.quantity} items</Text>
+                            <Text style={styles.productSummaryAmount}>${i?.price.toFixed(2)}</Text>
+                        </View>
+                    </View>
+                ))
+            }
             <TouchableOpacity onPress={() => navigation.navigate('CartScreen')} style={styles.goBackToCart}>
                 <Text style={styles.goBackText}>Go to cart</Text>
             </TouchableOpacity>
@@ -128,13 +159,6 @@ const CheckoutScreen = () => {
             <Text style={styles.paymentMethodTitle}>Choose a payment method</Text>
             <Text style={styles.paymentMethodSubtitle}>Please select a payment method most convenient to you.</Text>
             <View style={styles.paymentOptionsContainer}>
-                <Pressable onPress={() => setPaymentMethod('paypal')} style={styles.paymentOption}>
-                    <Text style={styles.paymentOptionText}>Paypal</Text>
-                    <View style={styles.paymentOptionRight}>
-                        <Image source={paypal_img} style={styles.paypalImage} />
-                        <View style={[styles.radio, paymentMethod === 'paypal' && styles.radioSelected]} />
-                    </View>
-                </Pressable>
                 <Pressable onPress={() => setPaymentMethod('credit_card')} style={styles.paymentOption}>
                     <Text style={styles.paymentOptionText}>Credit Card</Text>
                     <View style={styles.paymentOptionRight}>
@@ -150,10 +174,9 @@ const CheckoutScreen = () => {
                         <Text style={styles.linkText}>Change</Text>
                     </TouchableOpacity>
                 </View>
-                {selectedAddress && (
+                {customer_address && (
                     <View>
-                        <Text style={styles.addressText}>{selectedAddress.name} | {selectedAddress.phone}</Text>
-                        <Text style={styles.addressText}>{selectedAddress.street}</Text>
+                        <Text style={styles.addressText}>{customer_address}</Text>
                     </View>
                 )}
             </View>
@@ -171,11 +194,9 @@ const CheckoutScreen = () => {
                 <Text style={styles.summaryTitle}>Order Summary</Text>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>Subtotal</Text>
-                    <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>${total.toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Delivery Fee</Text>
-                    <Text style={styles.summaryValue}>${deliveryFees.toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryItem}>
                     <Text style={styles.totalLabel}>Total</Text>
@@ -207,40 +228,33 @@ const CheckoutScreen = () => {
                         <Text style={styles.linkText}>Edit</Text>
                     </TouchableOpacity>
                 </View>
-                {selectedAddress && (
+                {customer_address && (
                     <View style={styles.shippingDetails}>
                         <Text style={styles.shippingDetailLabel}>Name</Text>
-                        <Text style={styles.shippingDetailValue}>{selectedAddress.name}</Text>
+                        <Text style={styles.shippingDetailValue}>{customer_address}</Text>
                     </View>
                 )}
-                {selectedAddress && (
-                    <View style={styles.shippingDetails}>
-                        <Text style={styles.shippingDetailLabel}>Customer Address</Text>
-                        <Text style={styles.shippingDetailValue}>4517 Washington Ave. Man...</Text>
-                    </View>
-                )}
-                {selectedPickupStation && (
+                {pickup_station && (
                     <View style={styles.shippingDetails}>
                         <Text style={styles.shippingDetailLabel}>Pickup Station</Text>
-                        <Text style={styles.shippingDetailValue}>{selectedPickupStation.name}</Text>
+                        <Text style={styles.shippingDetailValue}>{pickup_station}</Text>
                     </View>
                 )}
-                {selectedAddress && (
+                {customer_address && (
                     <View style={styles.shippingDetails}>
                         <Text style={styles.shippingDetailLabel}>Delivery Between</Text>
-                        <Text style={styles.shippingDetailValue}>15 Jun and 17 Jun</Text>
+                        <Text style={styles.shippingDetailValue}>15 Sep and 17 Sep</Text>
                     </View>
                 )}
             </View>
         </ScrollView>
     );
 
-    const AddressModal = () => (
+    const MemoizedAddressModal = useMemo(() => (
         <Modal
             animationType="slide"
             transparent={true}
             visible={isAddressModalVisible}
-            onRequestClose={() => setAddressModalVisible(false)}
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalView}>
@@ -250,41 +264,31 @@ const CheckoutScreen = () => {
                             <Ionicons name="close-outline" size={24} color="white" />
                         </Pressable>
                     </View>
+
                     <View style={styles.searchBar}>
                         <Ionicons name="search" size={20} color="#888" />
-                        <TextInput placeholder='washington' style={{ flex: 1 }} />
+                        <TextInput
+                            value={customer_address}
+                            onChangeText={(text) => setCustomer_address(text)}
+                            placeholder="washington"
+                            style={{ flex: 1, color: "#fff" }}
+                        />
                     </View>
-                    <Image source={map_img} style={{ width: Dimensions.get("screen").width - 45, marginBottom: 30 }} />
-                    <ScrollView style={styles.addressList}>
-                        {
-                            [1, 2, 3, 4].map((i, inde) => (
-                                <Pressable key={i}
-                                    style={styles.addressOption}
-                                    onPress={() => {
-                                        setSelectedAddress({
-                                            name: "John Doe",
-                                            phone: "+1(406) 555-0120",
-                                            street: "4517 Washington Ave, Manchester, Kentucky 39495",
-                                            shipping: "USPS Ground Advantage...39320229"
-                                        });
-                                        setAddressModalVisible(false);
-                                    }}
-                                >
-                                    <Ionicons name="location-outline" size={20} color="#F28C28" />
-                                    <View style={styles.addressTextContainer}>
-                                        <Text style={styles.addressOptionText}>Washington D.C. DC, USA</Text>
-                                        <Text style={styles.addressOptionSubtitle}>555 Pennsylvania Avenue NW</Text>
-                                    </View>
-                                </Pressable>
-                            ))
-                        }
-                    </ScrollView>
+
+                    <Image
+                        source={map_img}
+                        style={{ width: Dimensions.get("screen").width - 45, marginBottom: 30 }}
+                    />
+
+                    <TouchableOpacity onPress={()=>setAddressModalVisible(false)} style={[styles.nextButton,{marginBottom:0}]}>
+                        <Text style={styles.nextButtonText}>Save</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </Modal>
-    );
+    ), [isAddressModalVisible, customer_address]);
 
-    const PickupModal = () => (
+    const MemoizedPickupModal = useMemo(() => (
         <Modal
             animationType="slide"
             transparent={true}
@@ -301,44 +305,20 @@ const CheckoutScreen = () => {
                     </View>
                     <View style={styles.searchBar}>
                         <Ionicons name="search" size={20} color="#888" />
-                        <Text style={styles.searchInput}>Search for location</Text>
+                        <TextInput
+                            value={pickup_station}
+                            onChangeText={(text) => Setpickup_station(text)}
+                            placeholder="Search for location"
+                            style={{ flex: 1, color: "#fff" }}
+                        />
                     </View>
-                    <View style={styles.locationHeader}>
-                        <Pressable style={styles.locationHeaderButton}>
-                            <Text style={styles.locationHeaderText}>Kentucky</Text>
-                            <Entypo name="chevron-thin-right" size={16} color="white" />
-                        </Pressable>
-                        <Pressable style={styles.locationHeaderButton}>
-                            <Text style={styles.locationHeaderText}>Manchester</Text>
-                            <Entypo name="chevron-thin-right" size={16} color="white" />
-                        </Pressable>
-                    </View>
-                    <ScrollView style={styles.addressList}>
-                        <Pressable
-                            style={[styles.pickupOption, selectedPickupStation?.name === "USPS Pickup Station Kentucky" && styles.pickupOptionSelected]}
-                            onPress={() => setSelectedPickupStation({
-                                name: "USPS Pickup Station Kentucky",
-                                address: "4517 Washington Ave, Manchester, Kentucky 39495"
-                            })}
-                        >
-                            <View>
-                                <Text style={styles.pickupOptionTitle}>USPS Pickup Station Kentucky</Text>
-                                <Text style={styles.pickupOptionAddress}>4517 Washington Ave, Manchester, Kentucky 39495</Text>
-                            </View>
-                            <View style={styles.pickupOptionRight}>
-                                <Text style={styles.pickupOptionPrice}>$15.00</Text>
-                                <View style={[styles.pickupRadio, selectedPickupStation?.name === "USPS Pickup Station Kentucky" && styles.pickupRadioSelected]} />
-                            </View>
-                        </Pressable>
-                        {/* More pickup options */}
-                    </ScrollView>
                     <TouchableOpacity onPress={() => setPickupModalVisible(false)} style={styles.saveButton}>
                         <Text style={styles.saveButtonText}>Save pickup station</Text>
                     </TouchableOpacity>
                 </View>
             </View>
         </Modal>
-    );
+    ), [isPickupModalVisible, pickup_station]);
 
     const SuccessModal = () => (
         <Modal
@@ -356,28 +336,22 @@ const CheckoutScreen = () => {
                     <Text style={styles.successText}>Get ready to enjoy the fruit of your purchase. Thanks for your purchase!</Text>
                     <View style={{ backgroundColor: "transparent", borderWidth: 1, borderColor: "#1B1B1B", margin: 30, padding: 20, borderRadius: 10, width: Dimensions.get("window").width }}>
                         <Text style={styles.summaryTitle}>Shipping Address</Text>
-                        {selectedAddress && (
+                        {customer_address && (
                             <View style={styles.shippingDetails}>
                                 <Text style={styles.shippingDetailLabel}>Name</Text>
-                                <Text style={styles.shippingDetailValue}>{selectedAddress.name}</Text>
+                                <Text style={styles.shippingDetailValue}>{customer_address}</Text>
                             </View>
                         )}
-                        {selectedAddress && (
-                            <View style={styles.shippingDetails}>
-                                <Text style={styles.shippingDetailLabel}>Customer Address</Text>
-                                <Text style={styles.shippingDetailValue}>4517...</Text>
-                            </View>
-                        )}
-                        {selectedPickupStation && (
+                        {pickup_station && (
                             <View style={styles.shippingDetails}>
                                 <Text style={styles.shippingDetailLabel}>Pickup Station</Text>
                                 <Text style={styles.shippingDetailValue}>4517 Washington Ave. Man...</Text>
                             </View>
                         )}
-                        {selectedAddress && (
+                        {customer_address && (
                             <View style={styles.shippingDetails}>
                                 <Text style={styles.shippingDetailLabel}>Delivery Between</Text>
-                                <Text style={styles.shippingDetailValue}>15 Jun and 17 Jun</Text>
+                                <Text style={styles.shippingDetailValue}>15 Sep and 17 Sep</Text>
                             </View>
                         )}
                     </View>
@@ -412,13 +386,12 @@ const CheckoutScreen = () => {
                     <Text style={styles.nextButtonText}>{currentStep === 2 ? 'Checkout' : 'Next'}</Text>
                 </TouchableOpacity>
             </View>
-            <AddressModal />
-            <PickupModal />
+            {MemoizedAddressModal}
+            {MemoizedPickupModal}
             <SuccessModal />
         </View>
     );
 };
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -843,7 +816,6 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: 'white',
         fontSize: 18,
-        fontWeight: 'bold',
     },
     successModalView: {
         backgroundColor: '#000',

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Modal, Image, TextInput, ToastAndroid } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image, ToastAndroid } from 'react-native';
 import BottomNavBar from '../components/BottomNav';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AntDesign from 'react-native-vector-icons/AntDesign';
@@ -10,7 +10,7 @@ import { useNavigation } from '@react-navigation/core';
 
 
 const SellerOrdersScreen = () => {
-    const [products, setProducts] = useState([])
+    const [orders, setOrders] = useState([])
     const navigation = useNavigation();
 
 
@@ -19,7 +19,7 @@ const SellerOrdersScreen = () => {
         try {
             let res = await axios.get(`${config.baseUrl}/order/seller/${userId}`)
             if (res?.data) {
-                setProducts(res?.data?.data);
+                setOrders(res?.data?.data);
             }
         }
         catch (error) {
@@ -33,6 +33,19 @@ const SellerOrdersScreen = () => {
             if (res?.data) {
                 fetchProduct();
                 ToastAndroid.show('Order Marked!', ToastAndroid.SHORT);
+
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    }
+    const orderStatus = async (id) => {
+        try {
+            let res = await axios.put(`${config.baseUrl}/order/status/${id}`, { status: "cancelled" })
+            if (res?.data) {
+                fetchProduct();
+                ToastAndroid.show('Order Cancelled!', ToastAndroid.SHORT);
 
             }
         }
@@ -65,38 +78,37 @@ const SellerOrdersScreen = () => {
 
                 <View>
                     {
-                        products?.map((i) => (
-                            <View key={i?._id} style={{ padding: 10, backgroundColor: '#1A1A1A', borderRadius: 10, marginVertical: 10, }}>
-
-                                <View style={{ flexDirection: "row", alignItems: "flex-start", borderBottomWidth: 2, borderBottomColor: "#494848", paddingBottom: 20 }}>
-
-                                    <Image source={{ uri: i.productId?.image }} alt='img' style={{ width: 70, height: 70, borderRadius: 10 }} />
-                                    <View style={{ marginLeft: 10 }}>
-                                        <Text style={{ color: "#c4c4c4", fontSize: 15, marginTop: 8 }}>Quantity : {i?.quantity}</Text>
-                                        <Text style={{ color: "#fff", fontSize: 15, marginTop: 3 }}>${i?.total}</Text>
+                        orders?.map((order) => (
+                            <View key={order._id} style={{ backgroundColor: '#171717', marginBottom: 20, padding: 10, }}>
+                                <View style={styles.orderCard}>
+                                    <Image source={{ uri: order?.productId?.images[0] }} style={styles.productImage} />
+                                    <View style={styles.orderDetails}>
+                                        <Text style={styles.productType}>{order?.productId?.categories[0]}</Text>
+                                        <Text style={styles.productName}>{order?.productId?.title}</Text>
                                     </View>
-
+                                    <View style={styles.priceContainer}>
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                                            <View style={[styles.statusTag, styles.ongoingTag]}><Text style={styles.statusText}>{order?.status}</Text></View>
+                                            <Text style={styles.priceItems}>{order?.quantity} Items</Text>
+                                        </View>
+                                        <Text style={styles.priceText}>${order?.total}</Text>
+                                    </View>
                                 </View>
+                                {
+                                    order.status === "ongoing" && (
+                                        <View>
 
-                                <Text style={{ color: "#fff", fontSize: 15, marginTop: 8 }}>Buyer Name : {i?.userId?.username}</Text>
-                                <Text style={{ color: "#fff", fontSize: 15, marginTop: 3 }}>Country : {i?.country}</Text>
-                                <Text style={{ color: "#fff", fontSize: 15, marginTop: 3 }}>City : {i?.city}</Text>
-                                <Text style={{ color: "#fff", fontSize: 15, marginTop: 3 }}>Phone : {i?.phone}</Text>
-                                <Text style={{ color: "#fff", fontSize: 15, marginTop: 3 }}>Address : {i?.address}</Text>
-
-                                <View style={{ justifyContent: "space-between", alignItems: "center", flexDirection: "row", marginTop: 15 }}>
-                                    {
-                                        !i?.delivered ? (
-                                            <TouchableOpacity onPress={() => deliverOrder(i?._id)} style={styles.cancelButton}>
-                                                <Text style={[styles.cancelText]}>Mark As Delivered</Text>
+                                            <TouchableOpacity onPress={() => orderStatus(order?._id)} style={{ backgroundColor: "red", marginTop: 10, paddingVertical: 7, borderRadius: 6, justifyContent: "center", alignItems: "center" }}>
+                                                <Text style={{ color: "white", fontSize: 15 }}>Cancel Order</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => deliverOrder(order?._id)} style={{ backgroundColor: "#2C2C2E", marginTop: 10, paddingVertical: 7, borderRadius: 6, justifyContent: "center", alignItems: "center" }}>
+                                                <Text style={{ color: "white", fontSize: 15 }}>Complete Order</Text>
                                             </TouchableOpacity>
 
-                                        ) :
-                                            <TouchableOpacity style={styles.cancelButton}>
-                                                <Text style={[styles.cancelText]}>Order Delivered</Text>
-                                            </TouchableOpacity>
-                                    }
-                                </View>
+                                        </View>
+                                    )
+                                }
+
 
                             </View>
                         ))
@@ -118,14 +130,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
-        paddingTop: 20,
+        paddingTop: 60,
         paddingHorizontal: 20,
         paddingBottom: 70
     },
     headerText: {
         color: 'white',
         fontSize: 20,
-        fontWeight: 'bold',
     },
     searchBar: {
         backgroundColor: '#1A1A1A',
@@ -134,7 +145,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 15,
         paddingVertical: 8,
-        marginBottom: 10
+        marginBottom: 30
     },
     searchIcon: {
         marginRight: 10,
@@ -143,256 +154,59 @@ const styles = StyleSheet.create({
     searchText: {
         color: "grey"
     },
-    tabContainer: {
-        flexDirection: "row",
-        marginBottom: 20
-    },
-    tab: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: "grey",
-        marginRight: 10
-    },
-    activeTab: {
-        backgroundColor: "orange",
-        borderColor: "orange"
-    },
-    tabText: {
-        color: "grey"
-    },
-    activeTabText: {
-        color: "black"
-    },
-    viewStoreButton: {
-        borderRadius: 30,
-        padding: 10,
-        alignItems: "center",
-        marginBottom: 20,
-        backgroundColor: "white",
-        width: 100
-    },
-    viewStoreText: {
-        color: "black"
-    },
-    sectionHeader: {
-        color: "white",
-        fontWeight: "bold",
+    orderCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 10
     },
-    inputContainer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        borderRadius: 5,
-        padding: 10,
-        marginBottom: 20,
-        backgroundColor: "#1A1A1A"
-    },
-    inputLabel: {
-        color: "grey"
-    },
-    inputValue: {
-        color: "white"
-    },
-    timeContainer: {
-        marginBottom: 20
-    },
-    timeOptionsContainer: {
-        flexDirection: "row",
-        flexWrap: "wrap"
-    },
-    timeOption: {
-        borderRadius: 5,
-        padding: 10,
-        marginRight: 10,
-        marginBottom: 10,
-        backgroundColor: "#1A1A1A",
-        marginTop: 10
-    },
-    activeTimeOption: {
-        backgroundColor: "orange",
-        borderColor: "orange"
-    },
-    timeOptionText: {
-        color: "white"
-    },
-    inActiveTimeOptionText: {
-        color: "white"
-    },
-    suddenDeathContainer: {
-        padding: 10,
-        marginBottom: 20
-    },
-    suddenDeathDescription: {
-        color: "grey",
-        marginTop: 10
-    },
-    buttonContainer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-    },
-    cancelButton: {
-        borderWidth: 1,
-        backgroundColor: "orange",
-        borderRadius: 5,
-        padding: 10,
-        alignItems: "center",
-        width: "100%"
-    },
-    cancelText: {
-        color: "white"
-    },
-    startAuctionButton: {
-        backgroundColor: "orange",
-        borderRadius: 25,
-        padding: 10,
-        width: "48%",
-        alignItems: "center"
-    },
-    startAuctionText: {
-        color: "white"
-    },
-
-    addPlatform: {
-        borderRadius: 5,
-        padding: 10,
-        marginBottom: 20,
-        backgroundColor: "#1A1A1A"
-    },
-    modalHandle: {
-        width: 40,
-        height: 5,
-        backgroundColor: 'white',
-        borderRadius: 2.5,
-        marginTop: 10,
-    },
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    modalContent: {
-        backgroundColor: '#000',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        paddingBottom: 40,
-        alignItems: 'center',
-    },
-    modalContent2: {
-        backgroundColor: '#000',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        paddingBottom: 40,
-    },
-    modalTitle: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 10,
-    },
-    modalSubtitle: {
-        color: 'grey',
-        marginBottom: 20,
-    },
-    platformIconsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-        marginBottom: 10,
-    },
-    platformIcon: {
-        backgroundColor: '#1A1A1A',
+    productImage: {
+        width: 50,
+        height: 50,
         borderRadius: 10,
-        padding: 6,
+        marginRight: 15,
     },
-    iconImage: {
-        width: 30,
-        height: 30,
+    orderDetails: {
+        flex: 1,
     },
-    buttonContainerModal: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 1
+    productType: {
+        color: '#888',
+        fontSize: 12,
     },
-    cancelButtonModal: {
-        borderWidth: 1,
-        borderColor: "grey",
-        borderRadius: 20,
-        padding: 10,
-        width: "48%",
-        alignItems: "center"
+    productName: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
+        marginVertical: 2,
     },
-    cancelTextModal: {
-        color: "white"
+    priceContainer: {
+        alignItems: 'flex-end',
     },
-    saveButtonModal: {
-        backgroundColor: "orange",
-        borderRadius: 20,
-        padding: 10,
-        width: "48%",
-        alignItems: "center",
-        marginLeft: 15
+    priceItems: {
+        color: '#888',
+        fontSize: 12,
     },
-    saveTextModal: {
-        color: "white"
-    },
-    rtmoSettings: {
-        width: '100%',
+    priceText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
         marginTop: 5,
     },
-    rtmoTitle: {
+    statusTag: {
+        borderRadius: 5,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    ongoingTag: {
+        backgroundColor: '#2C2C2E',
+        width: 70,
+        borderRadius: 10,
+        justifyContent: "center",
+        alignItems: "center"
+    },
+    statusText: {
         color: 'white',
-        fontWeight: 'bold',
-        marginBottom: 10,
+        fontSize: 12,
     },
-    inputContainerModal: {
-        marginBottom: 15,
-    },
-    inputLabelModal: {
-        color: 'grey',
-        marginBottom: 5,
-    },
-    inputModal: {
-        backgroundColor: '#1A1A1A',
-        color: "white",
-        borderRadius: 8,
-        padding: 10,
-    },
-    advancedSettings: {
-        marginTop: 15,
-    },
-    advancedSettingsTitle: {
-        color: 'white',
-        fontWeight: 'bold',
-        marginBottom: 10,
-    },
-    categoryContainer: {
-        flexDirection: 'row',
-        marginTop: 10
-    },
-    button: {
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'gray',
-        marginRight: 10,
-        backgroundColor: "#1A1A1A"
-    },
-    activeButton: {
-        borderColor: '#FFA500',
-        backgroundColor: '#FFA500',
-    },
-    inActiveButtonText: {
-        color: "grey"
-    },
-    buttonText: {
-        color: "black"
-    },
-
 });
 
 export default SellerOrdersScreen;

@@ -7,7 +7,7 @@ import AntDesign from 'react-native-vector-icons/AntDesign';
 import { useNavigation } from '@react-navigation/native';
 import config from '../config';
 import axios from 'axios';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { addToCart } from '../redux/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -16,7 +16,7 @@ import Video from 'react-native-video';
 const { width, height } = Dimensions.get('window');
 
 const HomeScreen = () => {
-
+    const cart = useSelector(state => state.cart.cartItems);
     const [activeCategory, setActiveCategory] = useState('');
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
@@ -279,14 +279,21 @@ const HomeScreen = () => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
 
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 80 }}>
                     <Text style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>TUGM</Text>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Pressable style={{ marginRight: 10 }} onPress={() => { navigation.navigate("Notification") }}>
                             <Ionicons name="notifications" size={24} color="white" />
                         </Pressable>
-                        <Pressable onPress={() => { navigation.navigate("Cart") }}>
+                        <Pressable onPress={() => { navigation.navigate("Cart") }} style={{ position: "relative" }}>
                             <Feather name="shopping-cart" size={24} color="white" />
+                            {
+                                cart.length > 0 && (
+                                    <View style={{ position: "absolute", top: -10, right: -10, backgroundColor: "#FFA500", justifyContent: "center", alignItems: "center", borderRadius: 100, width: 25, height: 25 }}>
+                                        <Text style={{ color: "#fff" }}>{cart.length ?? 0}</Text>
+                                    </View>
+                                )
+                            }
                         </Pressable>
                     </View>
                 </View>
@@ -490,7 +497,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
-        paddingTop: 60
     },
     storyContainer: {
         paddingVertical: 20,
