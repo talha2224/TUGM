@@ -35,14 +35,19 @@ const Notification = () => {
             setLoading(false);
         }
     };
-    const handleJoin = (streamId) => {
-        navigation.navigate("CreatorStream", { streamId: streamId,isHost:true,coHost:true })
+    const handleJoin = (streamId,type) => {
+        if(type=="stream"){
+            navigation.navigate("CreatorStream", { streamId: streamId,isHost:true,coHost:true })
+        }
+        else{
+            navigation.navigate("competition", { streamId: streamId,isHost:true,coHost:true })
+        }
     };
 
     const timeAgo = (dateString) => {
         const now = new Date();
         const past = new Date(dateString);
-        const diff = Math.floor((now - past) / 1000); // Difference in seconds
+        const diff = Math.floor((now - past) / 1000);
 
         if (diff < 60) return `${diff} sec ago`;
         if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
@@ -76,11 +81,11 @@ const Notification = () => {
                             }}
                         >
                             <Text style={{ color: "#fff", fontSize: 16 }}>
-                                <Text>{item.invitedBy?.username}</Text> invited you to a stream.
+                                <Text>{item.invitedBy?.username} invited you to a {item?.type=="stream"?"stream":"battle"}.</Text>
                             </Text>
                             <Text style={{ color: "#aaa", fontSize: 14, marginTop: 5 }}>{timeAgo(item.createdAt)}</Text>
 
-                            <TouchableOpacity style={{backgroundColor: "#007bff",padding: 10,borderRadius: 5,marginTop: 10,alignItems: "center",}} onPress={() => handleJoin(item.streamId)}>
+                            <TouchableOpacity style={{backgroundColor: "#007bff",padding: 10,borderRadius: 5,marginTop: 10,alignItems: "center",}} onPress={() => handleJoin(item.streamId,item?.type)}>
                                 <Text style={{ color: "#fff", fontSize: 14 }}>Join</Text>
                             </TouchableOpacity>
                         </View>

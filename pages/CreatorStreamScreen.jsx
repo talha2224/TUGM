@@ -416,12 +416,7 @@ const CreatorStreamScreen = ({ route }) => {
             ))}
 
             {!isHost && isJoined && remoteUids.length > 0 && remoteUids.map((uid, index) => (
-                <RtcSurfaceView
-                    key={uid}
-                    canvas={{ uid, renderMode: 1 }}
-                    connection={{ channelId: channelName, localUid }}
-                    style={index == 0 ? styles.remoteVideo2 : styles?.remoteVideo}
-                />
+                <RtcSurfaceView key={uid} canvas={{ uid, renderMode: 1 }} connection={{ channelId: channelName, localUid }} style={index == 0 ? styles.remoteVideo2 : styles?.remoteVideo}/>
             ))}
 
             {/* Controls */}

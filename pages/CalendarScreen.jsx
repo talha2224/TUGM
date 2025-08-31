@@ -142,7 +142,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
         paddingTop: 20
     },
-    // ... (rest of your existing styles) ...
     catContainer: {
         backgroundColor: '#000',
         padding: 20,

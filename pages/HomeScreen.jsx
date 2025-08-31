@@ -279,7 +279,7 @@ const HomeScreen = () => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
 
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 80 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop:40 }}>
                     <Text style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>TUGM</Text>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Pressable style={{ marginRight: 10 }} onPress={() => { navigation.navigate("Notification") }}>

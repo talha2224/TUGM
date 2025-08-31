@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import versus from '../../assets/competition/versus.png';
 import contestant from '../../assets/competition/contestant.png';
+import vs from '../../assets/competition/vs.png';
 import icon1 from '../../assets/competition/1.png';
 import icon2 from '../../assets/competition/2.png';
 import icon3 from '../../assets/competition/3.png';
@@ -33,8 +34,17 @@ import Entypo from 'react-native-vector-icons/Entypo';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/core';
 import { KeyboardAvoidingView, Platform } from 'react-native';
+import getPermission from '../../components/Permission';
+import createAgoraRtcEngine, { AudienceLatencyLevelType, ChannelProfileType, ClientRoleType, RtcSurfaceView } from 'react-native-agora';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import config from '../../config';
 
-const Competition = () => {
+const appId = config.appId;
+const localUid = 0;
+
+const Competition = ({ route }) => {
+    const { streamId, isHost, coHost = false } = route.params;
     const [showVersus, setShowVersus] = useState(true);
     const versusOpacity = useState(new Animated.Value(1))[0];
     const [isShareModalVisible, setIsShareModalVisible] = useState(false);
@@ -46,6 +56,21 @@ const Competition = () => {
     const perkMessageAnim = useRef(new Animated.Value(0)).current;
     const progressAnim = useRef(new Animated.Value(100)).current;
     const navigation = useNavigation();
+
+
+    // AGORA
+    const eventHandler = useRef(null);
+    const agoraEngineRef = useRef(null);
+    const [isJoined, setIsJoined] = useState(false);
+    const [remoteUids, setRemoteUids] = useState([]);
+    const [agoraUid, setagoraUid] = useState(null)
+    const [isMicMuted, setIsMicMuted] = useState(false);
+    const [isFrontCamera, setIsFrontCamera] = useState(true);
+    const [userProfile, setUserProfile] = useState({})
+    const [streamInfo, setStreamInfo] = useState({})
+    const [uid, setUid] = useState("")
+    const [channelName] = useState(streamId)
+
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -172,211 +197,416 @@ const Competition = () => {
         outputRange: ['0%', '100%'],
     });
 
+    // AGORA 
+    const fetchToken = async () => {
+        try {
+            let res = await axios.get(`${config.baseUrl3}/stream/token/${streamId}/${isHost ? "host" : "subscriber"}`);
+            if (res?.data) {
+                await setupVideoSDKEngine();
+                await setupEventHandler();
+                await join(res?.data?.data);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
+    const setupVideoSDKEngine = async () => {
+        if (Platform.OS === "android") {
+            await getPermission();
+        }
+
+        const engine = createAgoraRtcEngine();
+        agoraEngineRef.current = engine;
+        engine.initialize({ appId });
+        if (isHost) {
+            engine.enableVideo();
+            engine.startPreview();
+        }
+    };
+    const setupEventHandler = async () => {
+        eventHandler.current = {
+            onJoinChannelSuccess: () => {
+                setIsJoined(true);
+            },
+            onUserJoined: (_connection, uid) => {
+                setagoraUid(uid);
+                setTimeout(() => {
+                    setRemoteUids(prev => [...new Set([...prev, uid])]);
+                }, 1000);
+            },
+            onUserOffline: (_connection, uid) => {
+                setagoraUid(null)
+                setRemoteUids(prev => prev.filter(id => id !== uid));
+            },
+        };
+        agoraEngineRef.current?.registerEventHandler(eventHandler.current);
+    };
+    const join = async (tk) => {
+        if (!agoraEngineRef.current) return;
+
+        await agoraEngineRef.current.joinChannel(tk, channelName, localUid, {
+            channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+            clientRoleType: isHost ? ClientRoleType.ClientRoleBroadcaster : ClientRoleType.ClientRoleAudience,
+            publishMicrophoneTrack: isHost,
+            publishCameraTrack: isHost,
+            autoSubscribeAudio: true,
+            autoSubscribeVideo: true,
+            audienceLatencyLevel: isHost ? undefined : AudienceLatencyLevelType.AudienceLatencyLevelUltraLowLatency,
+        });
+    };
+
+    const leave = async () => {
+        await agoraEngineRef.current?.leaveChannel();
+        setIsJoined(false);
+        setRemoteUids(prev => prev.filter(id => id !== agoraUid));
+    };
+
+    const toggleMic = async () => {
+        const newMuteState = !isMicMuted;
+        await agoraEngineRef.current?.muteLocalAudioStream(newMuteState);
+        setIsMicMuted(newMuteState);
+    };
+
+    const switchCamera = async () => {
+        await agoraEngineRef.current?.switchCamera();
+        setIsFrontCamera(prev => !prev);
+    };
+
+    const cleanupAgoraEngine = () => {
+        return () => {
+            agoraEngineRef.current?.unregisterEventHandler(eventHandler.current);
+            agoraEngineRef.current?.release();
+        };
+    };
+
+    const fetchProfileInfo = async () => {
+        try {
+            let userId = await AsyncStorage.getItem('userId');
+            setUid(userId)
+            let res = await axios.get(`${config.baseUrl}/account/single/${userId}`);
+            if (res?.data) {
+                setUserProfile(res?.data?.data);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
+
+    const fetchStreamInfo = async () => {
+        try {
+            let res = await axios.get(`${config.baseUrl}/battle/info/${streamId}`);
+            if (res?.data) {
+                setStreamInfo(res?.data?.data);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
+
+    const handleEndStream = async () => {
+        try {
+            if (isHost && !coHost) {
+                let id = await AsyncStorage.getItem('userId');
+                let res = await axios.put(`${config.baseUrl}/battle/end/${id}`)
+                if (res?.data?.data) {
+                    navigation.navigate('Home')
+                    leave()
+                }
+            }
+            else {
+                await agoraEngineRef.current?.leaveChannel();
+                navigation.navigate('Home')
+            }
+        }
+        catch (error) {
+            navigation.navigate('Home')
+            leave()
+            console.log(error)
+        }
+    }
+
+    useEffect(() => {
+        const init = async () => {
+            await fetchToken()
+            agoraEngineRef.current?.enableVideo()
+        };
+        init();
+
+        return cleanupAgoraEngine();
+    }, []);
+
+    useEffect(() => {
+        fetchProfileInfo();
+        fetchStreamInfo();
+    }, [])
+
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-        >
-                <ScrollView showsHorizontalScrollIndicator={false} horizontal style={styles.header}>
-                    <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#3d1e1a", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
-                        <MaterialIcons name="bar-chart" size={20} style={{ color: "#FFC61A" }} />
-                        <Text style={{ color: "#fff" }}>Ranking Voter</Text>
-                        <SimpleLineIcons name="arrow-right" style={{ color: "#fff" }} />
-                    </TouchableOpacity>
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
 
-                    <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#1E1E1E", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
-                        <Feather name="user" size={16} style={{ color: "#fff" }} />
-                        <Text style={{ color: "#fff" }}>26</Text>
-                    </TouchableOpacity>
+            <ScrollView showsHorizontalScrollIndicator={false} horizontal style={styles.header}>
+                <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#3d1e1a", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
+                    <MaterialIcons name="bar-chart" size={20} style={{ color: "#FFC61A" }} />
+                    <Text style={{ color: "#fff" }}>Ranking Voter</Text>
+                    <SimpleLineIcons name="arrow-right" style={{ color: "#fff" }} />
+                </TouchableOpacity>
 
-                    <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#1E1E1E", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
-                        <Feather name="gift" size={16} style={{ color: "#FFC61A" }} />
-                        <Text style={{ color: "#fff" }}>Gifts</Text>
-                        <SimpleLineIcons name="arrow-right" style={{ color: "#fff" }} />
-                    </TouchableOpacity>
+                <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#1E1E1E", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
+                    <Feather name="user" size={16} style={{ color: "#fff" }} />
+                    <Text style={{ color: "#fff" }}>26</Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => navigation.navigate("Home")} style={{ marginRight: 30, maxHeight: 45, backgroundColor: "#FF3729", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
-                        <Text style={{ color: "#fff" }}>Quite battle</Text>
-                        <AntDesign name="close" size={16} style={{ color: "#fff" }} />
-                    </TouchableOpacity>
-                </ScrollView>
+                <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#1E1E1E", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
+                    <Feather name="gift" size={16} style={{ color: "#FFC61A" }} />
+                    <Text style={{ color: "#fff" }}>Gifts</Text>
+                    <SimpleLineIcons name="arrow-right" style={{ color: "#fff" }} />
+                </TouchableOpacity>
 
-                <Image source={header} style={{ backgroundColor: "#1a0b18", width: "100%", paddingBottom: 20 }} />
+                <TouchableOpacity onPress={handleEndStream} style={{ marginRight: 30, maxHeight: 45, backgroundColor: "#FF3729", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
+                    <Text style={{ color: "#fff" }}>Quite battle</Text>
+                    <AntDesign name="close" size={16} style={{ color: "#fff" }} />
+                </TouchableOpacity>
+            </ScrollView>
 
-                <Image source={contestant} style={styles.contestantImage} blurRadius={isImageBlurred ? 10 : 0} />
-                {showVersus && (
-                    <Animated.Image
-                        source={versus}
-                        style={[styles.versusImage, { opacity: versusOpacity }]}
-                    />
+            <View style={{ backgroundColor: "#1a0b18", justifyContent: "space-between", alignItems: "center", flexDirection: "row", paddingHorizontal: 20, paddingBottom: 20 }}>
+                <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                    <Image source={{ uri: streamInfo?.creatorId?.profile }} style={{ width: 40, height: 40, borderRadius: 100 }} />
+                    <View>
+                        <Text style={{ color: "white" }}>{streamInfo?.creatorId?.username}</Text>
+                        <Text style={{ color: "lightgray" }}>{streamInfo?.creatorId?.followers} Followers</Text>
+                    </View>
+                </View>
+                <Image source={vs} />
+                <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                    <Image source={{ uri: streamInfo?.opponentId?.profile }} style={{ width: 40, height: 40, borderRadius: 100 }} />
+                    <View>
+                        <Text style={{ color: "white" }}>{streamInfo?.opponentId?.username}</Text>
+                        <Text style={{ color: "lightgray" }}>{streamInfo?.opponentId?.followers} Followers</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* <Image source={contestant} style={styles.contestantImage} blurRadius={isImageBlurred ? 10 : 0} /> */}
+
+            <View style={{ display: "flex", backgroundColor: "#1a0b18", justifyContent: "space-between", gap: 10, alignItems: "center", flexDirection: "row" }}>
+                {isJoined && isHost && (
+                    <View style={{ borderWidth: 1, borderColor: "blue", overflow: "hidden", width: "50%", height: 300, position: "relative" }}>
+                        <RtcSurfaceView canvas={{ uid: localUid, renderMode: 1, mirrorMode: isFrontCamera ? 1 : 0, }} connection={{ channelId: channelName, localUid }} style={{ flex: 1 }} />
+                        <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: "#fff", fontSize: 15 }}>You</Text>
+                        </View>
+                    </View>
                 )}
 
-                <ScrollView style={styles.commentsContainer} showsVerticalScrollIndicator={false}>
-                    {comments.map((item, index) => (
-                        <View key={item.id} style={[styles.commentItem]}>
-                            <Image source={{ uri: `https://randomuser.me/api/portraits/men/${index + 1}.jpg` }} style={styles.commentAvatar} />
-                            <View>
-                                <Text style={styles.commentUser}>{item.user}</Text>
-                                <Text style={styles.commentText}>{item.comment}</Text>
-                            </View>
+                {isHost && isJoined && remoteUids?.map(uid => (
+                    <View style={{ borderWidth: 1, borderColor: "red", overflow: "hidden", width: "47%", height: 300, marginRight: 10,position:"relative" }}>
+                        <RtcSurfaceView
+                            key={uid}
+                            canvas={{ uid, renderMode: 1 }}
+                            connection={{ channelId: channelName, localUid }} style={{ flex: 1 }}
+                        />
+                        <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: "#fff", fontSize: 15 }}>{userProfile?.username}</Text>
                         </View>
-                    ))}
+                    </View>
+                ))}
 
-                    <ScrollView horizontal contentContainerStyle={{ marginTop: 20 }}>
-                        {
-                            [1, 3, 4, 9].map((i) => (
-                                <View key={i} style={{ marginRight: 20, width: 300, backgroundColor: "#fff", borderRadius: 6, flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, paddingHorizontal: 10 }}>
-                                    <Image source={TShirts} style={{ width: 70, height: 70 }} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text>Yellow T-Shirt</Text>
-                                        <Text style={{ marginTop: 4 }}>⭐ 4.0 200 sold</Text>
-                                        <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                                            <Text>$230 <Text style={{ color: "red" }}>$500</Text></Text>
-                                            <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#000", borderRadius: 100, justifyContent: "center", alignItems: "center" }}>
-                                                <Text style={{ color: "#fff", fontSize: 10 }}>Add to cart</Text>
-                                            </TouchableOpacity>
-                                        </View>
+            </View>
+
+            {/* FOR VIEWERS  */}
+            {
+                !isHost && isJoined && remoteUids.length > 0 && (
+                    <View style={{ display: "flex", backgroundColor: "#1a0b18", justifyContent: "space-between", gap: 10, alignItems: "center", flexDirection: "row" }}>
+                        
+                        <View style={{ borderWidth: 1, borderColor: "blue", overflow: "hidden", width: "50%", height: 300, }}>
+                            <RtcSurfaceView canvas={{ uid: remoteUids[0], renderMode: 1, mirrorMode: isFrontCamera ? 1 : 0, }} connection={{ channelId: channelName, localUid }} style={{ flex: 1 }} />
+                        </View>
+
+                        <View style={{ borderWidth: 1, borderColor: "red", overflow: "hidden", width: "47%", height: 300, marginRight: 10 }}>
+                            <RtcSurfaceView
+                                key={uid}
+                                canvas={{ uid:remoteUids[1], renderMode: 1 }}
+                                connection={{ channelId: channelName, localUid }} style={{ flex: 1 }}
+                            />
+                        </View>
+
+                    </View>
+                )
+            }
+
+
+
+            {showVersus && (
+                <Animated.Image source={versus} style={[styles.versusImage, { opacity: versusOpacity }]} />
+            )}
+
+            <ScrollView style={styles.commentsContainer} showsVerticalScrollIndicator={false}>
+                {comments.map((item, index) => (
+                    <View key={item.id} style={[styles.commentItem]}>
+                        <Image source={{ uri: `https://randomuser.me/api/portraits/men/${index + 1}.jpg` }} style={styles.commentAvatar} />
+                        <View>
+                            <Text style={styles.commentUser}>{item.user}</Text>
+                            <Text style={styles.commentText}>{item.comment}</Text>
+                        </View>
+                    </View>
+                ))}
+
+                <ScrollView horizontal contentContainerStyle={{ marginTop: 20 }}>
+                    {
+                        [1, 3, 4, 9].map((i) => (
+                            <View key={i} style={{ marginRight: 20, width: 300, backgroundColor: "#fff", borderRadius: 6, flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, paddingHorizontal: 10 }}>
+                                <Image source={TShirts} style={{ width: 70, height: 70 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text>Yellow T-Shirt</Text>
+                                    <Text style={{ marginTop: 4 }}>⭐ 4.0 200 sold</Text>
+                                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                                        <Text>$230 <Text style={{ color: "red" }}>$500</Text></Text>
+                                        <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#000", borderRadius: 100, justifyContent: "center", alignItems: "center" }}>
+                                            <Text style={{ color: "#fff", fontSize: 10 }}>Add to cart</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
-                            ))
-                        }
-                    </ScrollView>
-                    <View style={styles.commentInputBar}>
-                        <View style={styles.cartIconContainer}>
-                            <View style={styles.cartBadge}>
-                                <Text style={styles.cartBadgeText}>2</Text>
                             </View>
-                            <Ionicons name="cart-outline" size={24} color="#fff" />
+                        ))
+                    }
+                </ScrollView>
+                <View style={styles.commentInputBar}>
+                    <View style={styles.cartIconContainer}>
+                        <View style={styles.cartBadge}>
+                            <Text style={styles.cartBadgeText}>2</Text>
                         </View>
-
-                        <View style={styles.commentInputContainer}>
-                            <TextInput placeholder='Type your comment' style={styles.commentPlaceholder} />
-                        </View>
-
-                        <TouchableOpacity style={styles.sendButton}>
-                            <Ionicons name="send" size={18} color="#fff" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.giftButton}>
-                            <Ionicons name="gift" size={20} color="#fff" />
-                        </TouchableOpacity>
+                        <Ionicons name="cart-outline" size={24} color="#fff" />
                     </View>
 
-                </ScrollView>
+                    <View style={styles.commentInputContainer}>
+                        <TextInput placeholder='Type your comment' style={styles.commentPlaceholder} />
+                    </View>
 
-                <View style={styles.actionBar}>
-                    <TouchableOpacity style={styles.actionButton} onPress={togglePerksModal}>
-                        <FontAwesome name="magic" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>Perks</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                        <Ionicons name="chatbox" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>Mute chats</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                        <Entypo name="camera" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>Dual cam</Text>
+                    <TouchableOpacity style={styles.sendButton}>
+                        <Ionicons name="send" size={18} color="#fff" />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionButton} onPress={toggleImageBlur}>
-                        <MaterialIcons name="deblur" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>{isImageBlurred ? "UnBlur" : "Blur"}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => setIsShareModalVisible(true)}>
-                        <Feather name="share-2" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>Share</Text>
+                    <TouchableOpacity style={styles.giftButton}>
+                        <Ionicons name="gift" size={20} color="#fff" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Share Modal */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={isShareModalVisible}
-                    onRequestClose={() => setIsShareModalVisible(false)}
-                >
-                    <Pressable style={styles.modalBackground} onPress={() => setIsShareModalVisible(false)}>
-                        <Pressable style={styles.shareModalView}>
-                            <Text style={styles.shareModalTitle}>Share</Text>
-                            <View style={styles.shareOptionsContainer}>
-                                <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Copy link')}>
-                                    <Feather name="copy" size={20} color="#fff" />
-                                    <Text style={styles.shareOptionText}>Copy link</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Whatsapp')}>
-                                    <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
-                                    <Text style={styles.shareOptionText}>Whatsapp</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Instagram')}>
-                                    <AntDesign name="instagram" size={20} color="#C13584" />
-                                    <Text style={styles.shareOptionText}>Instagram</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Facebook')}>
-                                    <Feather name="facebook" size={20} color="#1877F2" />
-                                    <Text style={styles.shareOptionText}>Facebook</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Discord')}>
-                                    <MaterialCommunityIcons name="discord" size={20} color="#7289DA" />
-                                    <Text style={styles.shareOptionText}>Discord</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <TouchableOpacity style={styles.cancelShareButton} onPress={() => setIsShareModalVisible(false)}>
-                                <Text style={styles.cancelShareButtonText}>Cancel</Text>
+            </ScrollView>
+
+            <View style={styles.actionBar}>
+                <TouchableOpacity style={styles.actionButton} onPress={togglePerksModal}>
+                    <FontAwesome name="magic" size={20} color="#fff" />
+                    <Text style={styles.actionButtonText}>Perks</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton}>
+                    <Ionicons name="chatbox" size={20} color="#fff" />
+                    <Text style={styles.actionButtonText}>Mute chats</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={switchCamera} style={styles.actionButton}>
+                    <Entypo name="camera" size={20} color="#fff" />
+                    <Text style={styles.actionButtonText}>Switch cam</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.actionButton} onPress={toggleImageBlur}>
+                    <MaterialIcons name="deblur" size={20} color="#fff" />
+                    <Text style={styles.actionButtonText}>{isImageBlurred ? "UnBlur" : "Blur"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={() => setIsShareModalVisible(true)}>
+                    <Feather name="share-2" size={20} color="#fff" />
+                    <Text style={styles.actionButtonText}>Share</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Share Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isShareModalVisible}
+                onRequestClose={() => setIsShareModalVisible(false)}
+            >
+                <Pressable style={styles.modalBackground} onPress={() => setIsShareModalVisible(false)}>
+                    <Pressable style={styles.shareModalView}>
+                        <Text style={styles.shareModalTitle}>Share</Text>
+                        <View style={styles.shareOptionsContainer}>
+                            <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Copy link')}>
+                                <Feather name="copy" size={20} color="#fff" />
+                                <Text style={styles.shareOptionText}>Copy link</Text>
                             </TouchableOpacity>
-                        </Pressable>
+                            <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Whatsapp')}>
+                                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                                <Text style={styles.shareOptionText}>Whatsapp</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Instagram')}>
+                                <AntDesign name="instagram" size={20} color="#C13584" />
+                                <Text style={styles.shareOptionText}>Instagram</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Facebook')}>
+                                <Feather name="facebook" size={20} color="#1877F2" />
+                                <Text style={styles.shareOptionText}>Facebook</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.shareOption} onPress={() => handleShareOptionPress('Discord')}>
+                                <MaterialCommunityIcons name="discord" size={20} color="#7289DA" />
+                                <Text style={styles.shareOptionText}>Discord</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity style={styles.cancelShareButton} onPress={() => setIsShareModalVisible(false)}>
+                            <Text style={styles.cancelShareButtonText}>Cancel</Text>
+                        </TouchableOpacity>
                     </Pressable>
-                </Modal>
+                </Pressable>
+            </Modal>
 
-                {/* Perks Modal */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={isPerksModalVisible}
-                    onRequestClose={togglePerksModal}
-                >
-                    <Pressable style={styles.modalBackground} onPress={togglePerksModal}>
-                        <Pressable style={styles.perksModalView} onPress={(e) => e.stopPropagation()}>
-                            <View style={styles.perksModalHeader}>
-                                <Text style={styles.perksModalTitle}>Perks</Text>
-                                <TouchableOpacity onPress={togglePerksModal}>
-                                    <AntDesign name="close" size={24} color="#fff" />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.perksGrid}>
-                                {perksData.map((perk) => (
-                                    <TouchableOpacity key={perk.id} style={styles.perkItem} onPress={() => handlePerkClick(perk)}>
-                                        <Image source={perk.icon} style={styles.perkIcon} />
-                                        <View style={styles.perkTextContainer}>
-                                            <Text style={styles.perkName}>{perk.name}</Text>
-                                            <Pressable onPress={() => toggleTooltip(perk.id)} hitSlop={10}>
-                                                <AntDesign name="infocirlceo" size={14} color="#999" />
-                                            </Pressable>
+            {/* Perks Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isPerksModalVisible}
+                onRequestClose={togglePerksModal}
+            >
+                <Pressable style={styles.modalBackground} onPress={togglePerksModal}>
+                    <Pressable style={styles.perksModalView} onPress={(e) => e.stopPropagation()}>
+                        <View style={styles.perksModalHeader}>
+                            <Text style={styles.perksModalTitle}>Perks</Text>
+                            <TouchableOpacity onPress={togglePerksModal}>
+                                <AntDesign name="close" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.perksGrid}>
+                            {perksData.map((perk) => (
+                                <TouchableOpacity key={perk.id} style={styles.perkItem} onPress={() => handlePerkClick(perk)}>
+                                    <Image source={perk.icon} style={styles.perkIcon} />
+                                    <View style={styles.perkTextContainer}>
+                                        <Text style={styles.perkName}>{perk.name}</Text>
+                                        <Pressable onPress={() => toggleTooltip(perk.id)} hitSlop={10}>
+                                            <AntDesign name="infocirlceo" size={14} color="#999" />
+                                        </Pressable>
+                                    </View>
+                                    {tooltipVisible === perk.id && (
+                                        <View style={styles.tooltip}>
+                                            <Text style={styles.tooltipText}>{perk.description}</Text>
+                                            <View style={styles.tooltipTriangle} />
                                         </View>
-                                        {tooltipVisible === perk.id && (
-                                            <View style={styles.tooltip}>
-                                                <Text style={styles.tooltipText}>{perk.description}</Text>
-                                                <View style={styles.tooltipTriangle} />
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </Pressable>
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </Pressable>
-                </Modal>
+                </Pressable>
+            </Modal>
 
-                {/* Animated Perk Message View */}
-                {(perkMessage && !showSlamItem) && (
-                    <Animated.View style={[styles.perkMessageContainer, { transform: [{ translateY: perkMessageTranslateY }] }]}>
-                        <Text style={styles.perkMessageText}>{perkMessage}</Text>
-                        <Animated.View style={[styles.perkProgressBar, { width: progressBarWidth }]} />
-                    </Animated.View>
-                )}
+            {/* Animated Perk Message View */}
+            {(perkMessage && !showSlamItem) && (
+                <Animated.View style={[styles.perkMessageContainer, { transform: [{ translateY: perkMessageTranslateY }] }]}>
+                    <Text style={styles.perkMessageText}>{perkMessage}</Text>
+                    <Animated.View style={[styles.perkProgressBar, { width: progressBarWidth }]} />
+                </Animated.View>
+            )}
 
-                {showSlamItem && (
-                    <Image source={slam_item} style={styles.slamItemImage} />
-                )}
+            {showSlamItem && (
+                <Image source={slam_item} style={styles.slamItemImage} />
+            )}
 
         </KeyboardAvoidingView>
 
@@ -384,7 +614,7 @@ const Competition = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1,height:9000 },
+    container: { flex: 1, height: 9000 },
     header: {
         paddingTop: 60,
         paddingHorizontal: 15,
