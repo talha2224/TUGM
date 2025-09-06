@@ -38,6 +38,9 @@ import OrderTrackingScreen from './pages/OrderTrackingScreen';
 import RatingScreen from './pages/RatingScreen';
 import SupportScreen from './pages/Support/SupportScreen';
 import LiveSupportScreen from './pages/Support/LiveSupportScreen';
+import ProfileDetailScreen from './pages/ProfileDetailScreen';
+import PromotionDetailScreen from './pages/PromotionDetailScreen';
+import PromotionScreen from './pages/PromotionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -78,7 +81,10 @@ export default function App() {
               <Stack.Screen name="order_tracking" component={OrderTrackingScreen} />
               <Stack.Screen name="order_review" component={RatingScreen} />
               <Stack.Screen name="support" component={SupportScreen} />
+              <Stack.Screen name="profile_details" component={ProfileDetailScreen} />
               <Stack.Screen name="live_support" component={LiveSupportScreen} />
+              <Stack.Screen name="promotion" component={PromotionScreen} />
+              <Stack.Screen name="promotion_details" component={PromotionDetailScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </StripeProvider>

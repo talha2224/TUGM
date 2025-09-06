@@ -1,66 +1,22 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Image, FlatList } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Image, FlatList, ToastAndroid } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import Feather from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/core';
-import product_img from '../../assets/product_img.png'
-
-// Placeholder images - replace with actual product images if available
-const product_img_1 = product_img;
-const product_img_2 = product_img;
-const product_img_3 = product_img;
-const product_img_4 = product_img;
+import { useDispatch, useSelector } from 'react-redux';
+import { addToCart } from '../../redux/cartSlice';
+import { removeFromFavourite } from '../../redux/favouriteSlice';
 
 
-const favoriteProducts = [
-    {
-        id: '1',
-        name: 'Jacket name',
-        image: product_img_1,
-        rating: 4.9,
-        reviews: 300,
-        price: 45.00,
-        discount: '-33%',
-        isOutOfStock: false,
-    },
-    {
-        id: '2',
-        name: 'Jacket name',
-        image: product_img_2,
-        rating: 4.9,
-        reviews: 7700,
-        price: 85.00,
-        discount: null,
-        isOutOfStock: true,
-    },
-    {
-        id: '3',
-        name: 'Jacket name',
-        image: product_img_3,
-        rating: 4.0,
-        reviews: 200,
-        price: 25.00,
-        discount: null,
-        isOutOfStock: false,
-    },
-    {
-        id: '4',
-        name: 'Jacket name',
-        image: product_img_4,
-        rating: 3.0,
-        reviews: 65,
-        price: 20.00,
-        discount: null,
-        isOutOfStock: false,
-    },
-];
+const ProductCard = ({ product, handleAddToCard, handleRemoveFromFav }) => {
+    const randomRating = (Math.random() * (5 - 3) + 3).toFixed(1);
+    const randomReviews = Math.floor(Math.random() * 200) + 1;
 
-const ProductCard = ({ product }) => {
     return (
         <View style={styles.productCard}>
             <View style={styles.productImageContainer}>
-                <Image source={product.image} style={styles.productImage} />
-                <TouchableOpacity style={styles.favoriteIcon}>
+                <Image source={{ uri: product.images?.[0] }} style={styles.productImage} />
+                <TouchableOpacity style={styles.favoriteIcon} onPress={() => handleRemoveFromFav(product._id)}>
                     <MaterialIcons name="favorite" size={20} color="#FF6347" />
                 </TouchableOpacity>
                 {product.discount && (
@@ -68,27 +24,53 @@ const ProductCard = ({ product }) => {
                         <Text style={styles.discountText}>{product.discount}</Text>
                     </View>
                 )}
-                {product.isOutOfStock && (
+                {product.stock === 0 && (
                     <View style={styles.outOfStockBadge}>
                         <Text style={styles.outOfStockText}>Out of stock</Text>
                     </View>
                 )}
             </View>
-            <Text style={styles.productName}>{product.name}</Text>
+
+            <Text style={styles.productName}>{product.title}</Text>
+
             <View style={styles.ratingContainer}>
                 <MaterialIcons name="star" size={14} color="#FFA500" />
-                <Text style={styles.ratingText}>{product.rating} ({product.reviews} Reviews)</Text>
+                <Text style={styles.ratingText}>
+                    {product.rating ?? randomRating} ({product.reviews ?? randomReviews} Reviews)
+                </Text>
             </View>
+
             <Text style={styles.productPrice}>${product.price.toFixed(2)}</Text>
-            <TouchableOpacity style={styles.addToCartButton}>
+
+            {/* Add to Cart */}
+            <TouchableOpacity onPress={() => handleAddToCard(product)} style={styles.addToCartButton}>
                 <Text style={styles.addToCartButtonText}>Add to cart</Text>
+            </TouchableOpacity>
+
+            {/* Remove from Fav */}
+            <TouchableOpacity onPress={() => handleRemoveFromFav(product._id)} style={styles.removeButton}>
+                <Text style={styles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
         </View>
     );
 };
 
+
+
 const FavouriteScreen = () => {
     const navigation = useNavigation();
+    const cart = useSelector(state => state.cart.cartItems);
+    const products = useSelector(state => state.favourite.favouriteItems,);
+    const dispatch = useDispatch();
+
+    const handleAddToCard = (product) => {
+        ToastAndroid.show('Item Added In Cart', ToastAndroid.SHORT);
+        dispatch(addToCart({ ...product, quantity: 1 }));
+    };
+    const handleRemoveFromFav = (id) => {
+        dispatch(removeFromFavourite(id));
+        ToastAndroid.show('Removed from Favorites', ToastAndroid.SHORT);
+    };
 
     return (
         <View style={styles.fullScreenContainer}>
@@ -98,20 +80,27 @@ const FavouriteScreen = () => {
                     <MaterialIcons name="keyboard-arrow-left" size={28} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Favorites</Text>
-                <TouchableOpacity style={styles.headerIcon}>
-                    <FontAwesome5 name="shopping-cart" size={20} color="#fff" />
+                <TouchableOpacity onPress={() => { navigation.navigate("Cart") }} style={{ position: "relative" }}>
+                    <Feather name="shopping-cart" size={24} color="white" />
+                    {
+                        cart.length > 0 && (
+                            <View style={{ position: "absolute", top: -10, right: -10, backgroundColor: "#FFA500", justifyContent: "center", alignItems: "center", borderRadius: 100, width: 25, height: 25 }}>
+                                <Text style={{ color: "#fff" }}>{cart.length ?? 0}</Text>
+                            </View>
+                        )
+                    }
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollViewContent}>
-                <Text style={styles.favoriteCount}>Favorite ({favoriteProducts.length})</Text>
+                <Text style={styles.favoriteCount}>Favorite ({products.length})</Text>
                 <FlatList
-                    data={favoriteProducts}
-                    renderItem={({ item }) => <ProductCard product={item} />}
-                    keyExtractor={(item) => item.id}
+                    data={products}
+                    renderItem={({ item }) => <ProductCard product={item} handleAddToCard={handleAddToCard} handleRemoveFromFav={handleRemoveFromFav} />}
+                    keyExtractor={(item) => item._id}
                     numColumns={2}
                     columnWrapperStyle={styles.row}
-                    scrollEnabled={false} // Disable FlatList scrolling as it's inside a ScrollView
+                    scrollEnabled={false}
                 />
             </ScrollView>
         </View>

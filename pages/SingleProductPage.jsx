@@ -14,14 +14,14 @@ const SingleProductPage = () => {
     const { productId } = route.params;
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [selectedImage, setSelectedImage] = useState(null); // ✅ state for variant
+    const [selectedImage, setSelectedImage] = useState(null);
 
     useEffect(() => {
         const fetchProduct = async () => {
             try {
                 const res = await axios.get(`${config.baseUrl}/product/single/${productId}`);
                 setProduct(res.data.data);
-                setSelectedImage(res.data.data?.images[0]); // ✅ default first image
+                setSelectedImage(res.data.data?.images[0]); 
             } catch (err) {
                 console.log("Error fetching product:", err);
             } finally {
@@ -133,7 +133,7 @@ const SingleProductPage = () => {
                 </View>
                 {
                     [1, 2, 3, 4].map((i) => (
-                        <View key={i} style={styles.reviewCard}>
+                        <Pressable onPress={() => { navigation.navigate("profile_details", { userId: product?.userId }) }}key={i} style={styles.reviewCard}>
                             <Image source={review} style={styles.reviewerImage} />
                             <View style={styles.reviewContent}>
                                 <View style={styles.reviewerInfo}>
@@ -151,7 +151,7 @@ const SingleProductPage = () => {
                                     “I've delivered the best quality clothes and I'm very happy with it.”
                                 </Text>
                             </View>
-                        </View>
+                        </Pressable>
                     ))
                 }
             </View>

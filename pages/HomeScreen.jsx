@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
 
 import Video from 'react-native-video';
+import { addToFavourite } from '../redux/favouriteSlice';
 const { width, height } = Dimensions.get('window');
 
 const HomeScreen = () => {
@@ -21,7 +22,7 @@ const HomeScreen = () => {
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [streams, setStreams] = useState([])
-    const [filterproducts, setFilterProducts] = useState([]);
+    const [_, setFilterProducts] = useState([]);
     const [uid, setUid] = useState("");
     const [profileData, setprofileData] = useState(null)
     const [stories, setstories] = useState([]);
@@ -62,9 +63,7 @@ const HomeScreen = () => {
         try {
             let res = await axios.get(`${config.baseUrl}/product/all`);
             if (res?.data) {
-                // const filtered = res.data.data.filter(product => product.categoryId.category === "Jacket");
                 setProducts(res?.data?.data);
-                // setFilterProducts(filtered);
             }
         }
         catch (error) {
@@ -359,6 +358,9 @@ const HomeScreen = () => {
                         <TouchableOpacity onPress={() => navigation.navigate("single_product", { productId: product._id })} key={product._id} style={styles.card}>
                             <TouchableOpacity style={styles.cartButton} onPress={() => handleAddToCard(product)}>
                                 <AntDesign name="plus" size={20} color="white" />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.cartButton,{top:40}]} onPress={() => {dispatch(addToFavourite(product));ToastAndroid.show("Item Added",ToastAndroid.SHORT)}}>
+                                <AntDesign name="heart" size={13} color="white" />
                             </TouchableOpacity>
                             <Image source={{ uri: product.images[0] }} style={styles.productImage} />
                             <View style={styles.productInfo}>

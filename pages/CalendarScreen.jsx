@@ -22,7 +22,7 @@ const CalendarScreen = () => {
 
     const fetchLiveStreams = async () => {
         try {
-            let res = await axios.get(`${config.baseUrl}/stream/active`);
+            let res = await axios.get(`${config.baseUrl}/battle/active`);
             if (res?.data) {
                 setStreams(res?.data?.data);
             }
@@ -85,7 +85,7 @@ const CalendarScreen = () => {
                     streams?.length > 0 ?
                         <View style={styles.cardList}>
                             {streams?.map((stream, index) => (
-                                <TouchableOpacity onPress={() => { navigation.navigate("CreatorStream", { streamId: stream?.streamId, isHost: false }) }} key={index} style={styles.card}>
+                                <TouchableOpacity onPress={() => { navigation.navigate("competition", { streamId: stream?.streamId, isHost: false }) }} key={index} style={styles.card}>
                                     <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage }} style={styles.cardImage} blurRadius={4} />
                                     <View style={styles.cardOverlay}>
                                         <View style={styles.profileContainer}>

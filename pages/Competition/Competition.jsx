@@ -11,19 +11,13 @@ import {
     Animated,
     Dimensions,
     TextInput,
+    Alert,
+    ToastAndroid,
+    StatusBar,
 } from 'react-native';
 import versus from '../../assets/competition/versus.png';
-import contestant from '../../assets/competition/contestant.png';
 import vs from '../../assets/competition/vs.png';
-import icon1 from '../../assets/competition/1.png';
-import icon2 from '../../assets/competition/2.png';
-import icon3 from '../../assets/competition/3.png';
-import icon4 from '../../assets/competition/4.png';
-import icon5 from '../../assets/competition/5.png';
-import icon6 from '../../assets/competition/6.png';
 import slam_item from '../../assets/competition/slam_item.png';
-import TShirts from '../../assets/T-Shirts.png';
-import header from '../../assets/competition/header.png';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import AntDesign from 'react-native-vector-icons/AntDesign';
@@ -32,19 +26,24 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Entypo from 'react-native-vector-icons/Entypo';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/core';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/core';
 import getPermission from '../../components/Permission';
 import createAgoraRtcEngine, { AudienceLatencyLevelType, ChannelProfileType, ClientRoleType, RtcSurfaceView } from 'react-native-agora';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import config from '../../config';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { perksData } from '../../constant/perk';
+import io from "socket.io-client";
+import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
+import { BlurView } from '@react-native-community/blur';
 
 const appId = config.appId;
 const localUid = 0;
 
 const Competition = ({ route }) => {
     const { streamId, isHost, coHost = false } = route.params;
+    const socketRef = useRef(null);
     const [showVersus, setShowVersus] = useState(true);
     const versusOpacity = useState(new Animated.Value(1))[0];
     const [isShareModalVisible, setIsShareModalVisible] = useState(false);
@@ -64,12 +63,15 @@ const Competition = ({ route }) => {
     const [isJoined, setIsJoined] = useState(false);
     const [remoteUids, setRemoteUids] = useState([]);
     const [agoraUid, setagoraUid] = useState(null)
-    const [isMicMuted, setIsMicMuted] = useState(false);
     const [isFrontCamera, setIsFrontCamera] = useState(true);
     const [userProfile, setUserProfile] = useState({})
     const [streamInfo, setStreamInfo] = useState({})
     const [uid, setUid] = useState("")
     const [channelName] = useState(streamId)
+
+    // CHAT 
+    const [comments, setComments] = useState([]);
+    const [message, setMessage] = useState("");
 
 
     useEffect(() => {
@@ -85,58 +87,6 @@ const Competition = ({ route }) => {
 
         return () => clearTimeout(timer);
     }, []);
-
-    const comments = [
-        { id: '1', user: 'TropicParadise', comment: 'You’re looking bro' },
-        { id: '2', user: '@d_charile', comment: 'You’re so underrated bruh' },
-        { id: '3', user: '@d_jatin_gammal', comment: 'joined' },
-        { id: '4', user: 'User456', comment: 'Great competition!' },
-        { id: '5', user: 'LiveFan', comment: 'Who do you think will win?' },
-        { id: '6', user: 'GamingGuru', comment: 'Awesome moves!' },
-        { id: '7', user: 'StreamWatcher', comment: 'Loving the energy!' },
-        { id: '8', user: 'TropicParadise', comment: 'You’re looking bro' },
-        { id: '9', user: '@d_charile', comment: 'You’re so underrated bruh' },
-        { id: '10', user: '@d_jatin_gammal', comment: 'joined' },
-    ];
-
-    const perksData = [
-        {
-            id: 'perk1',
-            name: 'Expose',
-            icon: icon1,
-            description: 'Force opponent to show the item tag and stitching.',
-        },
-        {
-            id: 'perk2',
-            name: 'Item Slam',
-            icon: icon2,
-            description: 'Temporarily disable opponent’s item.',
-        },
-        {
-            id: 'perk3',
-            name: 'Dark Mode',
-            icon: icon3,
-            description: 'Apply a dark filter to opponent’s screen.',
-        },
-        {
-            id: 'perk4',
-            name: 'Steal the Mic',
-            icon: icon4,
-            description: 'Take over opponent’s audio for a short duration.',
-        },
-        {
-            id: 'perk5',
-            name: 'Drop Price',
-            icon: icon5,
-            description: 'Force a temporary price drop on opponent’s item.',
-        },
-        {
-            id: 'perk6',
-            name: 'Audience Flip',
-            icon: icon6,
-            description: 'Temporarily swap audience votes with opponent.',
-        },
-    ];
 
     const handleShareOptionPress = (platform) => {
         setIsShareModalVisible(false);
@@ -155,37 +105,43 @@ const Competition = ({ route }) => {
         setTooltipVisible(prevId => (prevId === perkId ? null : perkId));
     };
 
-    const handlePerkClick = (perk) => {
-        setPerkMessage(perk.description);
+    const handlePerkClick = async (perk) => {
         setIsPerksModalVisible(false);
         setTooltipVisible(null);
+        if (perk?.price) {
+            try {
+                let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: perk?.price * 100, currency: "usd" });
+                if (!paymentIntentRes?.data?.clientSecret) {
+                    throw new Error("Failed to fetch payment intent");
+                }
+                let clientSecret = paymentIntentRes?.data?.clientSecret
+                if (clientSecret) {
+                    const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
+                    if (initResponse.error) {
+                        Alert.alert(initResponse?.error?.message)
+                        return
+                    }
+                    else {
+                        const paymentResponse = await presentPaymentSheet()
+                        if (paymentResponse.error) {
+                            Alert.alert(paymentResponse?.error?.message)
+                            return
+                        }
+                        else {
+                            setPerkMessage(perk.description);
+                            socketRef.current?.emit("sendPerk", { streamId, user: userProfile, perk });
+                        }
+                    }
 
-        if (perk.name === 'Item Slam') {
-            setShowSlamItem(true);
+                }
+            }
+            catch (error) {
+
+            }
+
         }
-
-        Animated.timing(perkMessageAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-        }).start(() => {
-            Animated.timing(progressAnim, {
-                toValue: 0,
-                duration: 3000,
-                useNativeDriver: false,
-            }).start(() => {
-                Animated.timing(perkMessageAnim, {
-                    toValue: 0,
-                    duration: 300,
-                    useNativeDriver: true,
-                }).start(() => {
-                    setPerkMessage(null);
-                    progressAnim.setValue(100);
-                    setShowSlamItem(false);
-                });
-            });
-        });
     };
+
 
     const perkMessageTranslateY = perkMessageAnim.interpolate({
         inputRange: [0, 1],
@@ -262,12 +218,6 @@ const Competition = ({ route }) => {
         setRemoteUids(prev => prev.filter(id => id !== agoraUid));
     };
 
-    const toggleMic = async () => {
-        const newMuteState = !isMicMuted;
-        await agoraEngineRef.current?.muteLocalAudioStream(newMuteState);
-        setIsMicMuted(newMuteState);
-    };
-
     const switchCamera = async () => {
         await agoraEngineRef.current?.switchCamera();
         setIsFrontCamera(prev => !prev);
@@ -293,7 +243,6 @@ const Competition = ({ route }) => {
         }
     };
 
-
     const fetchStreamInfo = async () => {
         try {
             let res = await axios.get(`${config.baseUrl}/battle/info/${streamId}`);
@@ -305,15 +254,64 @@ const Competition = ({ route }) => {
         }
     };
 
+    const fetchMessages = async () => {
+        try {
+            let res = await axios.get(`${config.baseUrl}/battle/messages/${streamId}`);
+            if (res?.data?.data) {
+                setComments(res.data.data);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
+    const handleSend = async () => {
+        if (!message.trim()) return;
+        let userId = await AsyncStorage.getItem("userId");
+        await axios.post(`${config.baseUrl}/battle/message`, { battleId: streamId, userId, message })
+        setMessage("");
+    };
+
+    const handleVote = async (type) => {
+        try {
+            let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: 1 * 100, currency: "usd" });
+            if (!paymentIntentRes?.data?.clientSecret) {
+                throw new Error("Failed to fetch payment intent");
+            }
+            let clientSecret = paymentIntentRes?.data?.clientSecret
+            if (clientSecret) {
+                const initResponse = await initPaymentSheet({ merchantDisplayName: "User", paymentIntentClientSecret: clientSecret })
+                if (initResponse.error) {
+                    Alert.alert(initResponse?.error?.message)
+                    return
+                }
+                else {
+                    const paymentResponse = await presentPaymentSheet()
+                    if (paymentResponse.error) {
+                        Alert.alert(paymentResponse?.error?.message)
+                        return
+                    }
+                    else {
+                        const result = await axios.post(`${config.baseUrl}/battle/vote`, { battleId: streamId, type });
+                        if (result.data) {
+                            ToastAndroid.show("Vote Added", ToastAndroid.SHORT)
+                        }
+                    }
+                }
+
+            }
+        } catch (error) {
+            console.log("Vote error:", error.response?.data || error.message);
+        }
+    };
 
     const handleEndStream = async () => {
         try {
             if (isHost && !coHost) {
-                let id = await AsyncStorage.getItem('userId');
-                let res = await axios.put(`${config.baseUrl}/battle/end/${id}`)
+                let res = await axios.put(`${config.baseUrl}/battle/end/${streamInfo?._id}`)
                 if (res?.data?.data) {
-                    navigation.navigate('Home')
                     leave()
+                    navigation.navigate('Home')
                 }
             }
             else {
@@ -341,10 +339,86 @@ const Competition = ({ route }) => {
     useEffect(() => {
         fetchProfileInfo();
         fetchStreamInfo();
+        fetchMessages();
     }, [])
 
+    useEffect(() => {
+        socketRef.current = io(config.socketUrl, { transports: ["websocket"] });
+        socketRef.current.emit("join", { streamId });
+        socketRef.current.on("newMessage", (msg) => {
+            setComments(prev => [msg, ...prev]);
+        });
+        socketRef.current.on("voteUpdate", (battleData) => {
+            setStreamInfo(battleData);
+        });
+        socketRef.current.on("newPerk", (data) => {
+            setPerkMessage(`${data.user.username} used ${data.perk.name}: ${data.perk.description}`);
+            if (data.perk.name === 'Item Slam') {
+                setShowSlamItem(true);
+            }
+            Animated.timing(perkMessageAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }).start(() => {
+                Animated.timing(progressAnim, {
+                    toValue: 0,
+                    duration: 3000,
+                    useNativeDriver: false,
+                }).start(() => {
+                    Animated.timing(perkMessageAnim, {
+                        toValue: 0,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        setPerkMessage(null);
+                        progressAnim.setValue(100);
+                        setShowSlamItem(false);
+                    });
+                });
+            });
+        });
+        return () => {
+            socketRef.current.disconnect();
+        };
+    }, [streamId]);
+
+
+    useFocusEffect(
+        React.useCallback(() => {
+            StatusBar.setHidden(true);
+            return () => {
+                StatusBar.setHidden(false);
+            };
+        }, [])
+    );
+
+    const isCreator = userProfile?._id == streamInfo?.creatorId?._id
+
+    const getStatusAndColor = (side) => {
+        const creatorVotes = Number(streamInfo?.creatorVotes || 0);
+        const opponentVotes = Number(streamInfo?.opponentVotes || 0);
+        if (creatorVotes === opponentVotes) {
+            return { status: "Tied", color: "#6b7280", votes: side === "creator" ? creatorVotes : opponentVotes };
+        }
+
+        if (side === "creator") {
+            return creatorVotes > opponentVotes
+                ? { status: "Winning", color: "blue", votes: streamInfo?.creatorVotes }
+                : { status: "Losing", color: "red", votes: streamInfo?.creatorVotes };
+        } else {
+            return opponentVotes > creatorVotes
+                ? { status: "Winning", color: "blue", votes: streamInfo?.opponentVotes }
+                : { status: "Losing", color: "red", votes: streamInfo?.opponentVotes };
+        }
+    };
+    const creatorBadge = getStatusAndColor("creator");
+    const opponentBadge = getStatusAndColor("opponent");
+
     return (
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.container} enableOnAndroid={true}>
+
+            <StatusBar hidden={true} />
 
             <ScrollView showsHorizontalScrollIndicator={false} horizontal style={styles.header}>
                 <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#3d1e1a", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
@@ -355,7 +429,7 @@ const Competition = ({ route }) => {
 
                 <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#1E1E1E", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
                     <Feather name="user" size={16} style={{ color: "#fff" }} />
-                    <Text style={{ color: "#fff" }}>26</Text>
+                    <Text style={{ color: "#fff" }}>{remoteUids?.length > 0 ? remoteUids.length : 1}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={{ maxHeight: 45, marginRight: 10, backgroundColor: "#1E1E1E", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40, gap: 5, alignItems: "center", flexDirection: "row" }}>
@@ -388,27 +462,64 @@ const Competition = ({ route }) => {
                 </View>
             </View>
 
-            {/* <Image source={contestant} style={styles.contestantImage} blurRadius={isImageBlurred ? 10 : 0} /> */}
 
             <View style={{ display: "flex", backgroundColor: "#1a0b18", justifyContent: "space-between", gap: 10, alignItems: "center", flexDirection: "row" }}>
+
                 {isJoined && isHost && (
                     <View style={{ borderWidth: 1, borderColor: "blue", overflow: "hidden", width: "50%", height: 300, position: "relative" }}>
                         <RtcSurfaceView canvas={{ uid: localUid, renderMode: 1, mirrorMode: isFrontCamera ? 1 : 0, }} connection={{ channelId: channelName, localUid }} style={{ flex: 1 }} />
-                        <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ color: "#fff", fontSize: 15 }}>You</Text>
+                        <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "#4D1C2B", justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: "#fff", fontSize: 14 }}>You</Text>
+                        </View>
+
+                        <View style={{ position: "absolute", top: 0, width: "100%", justifyContent: "center", alignItems: "center" }}>
+                            <View style={{
+                                backgroundColor: isCreator ? creatorBadge.color : opponentBadge.color,
+                                paddingHorizontal: 20,
+                                paddingVertical: 4,
+                                borderBottomLeftRadius: 10,
+                                borderBottomRightRadius: 10
+                            }}>
+                                <Text style={{ color: "#fff" }}>{isCreator ? creatorBadge.status : opponentBadge.status}</Text>
+                            </View>
+                        </View>
+                        <View style={{ position: "absolute", bottom: 60, width: "100%", left: 10 }}>
+                            <TouchableOpacity onPress={() => handleVote(isCreator ? "creator" : "opponent")} style={{ backgroundColor: "#404151", width: "60%", paddingVertical: 5, borderRadius: 100, paddingHorizontal: 10, flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
+                                <Text style={{ color: "#fff", fontSize: 13 }}>👍 {isCreator ? streamInfo?.creatorVotes : streamInfo?.opponentVotes} Votes</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 )}
 
                 {isHost && isJoined && remoteUids?.map(uid => (
-                    <View style={{ borderWidth: 1, borderColor: "red", overflow: "hidden", width: "47%", height: 300, marginRight: 10,position:"relative" }}>
+                    <View key={uid} style={{ borderWidth: 1, borderColor: "red", overflow: "hidden", width: "47%", height: 300, marginRight: 10, position: "relative" }}>
                         <RtcSurfaceView
                             key={uid}
                             canvas={{ uid, renderMode: 1 }}
                             connection={{ channelId: channelName, localUid }} style={{ flex: 1 }}
                         />
-                        <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ color: "#fff", fontSize: 15 }}>{userProfile?.username}</Text>
+                        {isImageBlurred && (
+                            <View style={{ position: "absolute", left: 0, right: 0, width: "100%", height: "100%", backgroundColor: "rgba(255, 255, 255,0.4)", zIndex: 100 }}>
+                            </View>
+                        )}
+                        <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "#6478ddff", justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: "#fff", fontSize: 14 }}>{userProfile?.username}</Text>
+                        </View>
+                        <View style={{ position: "absolute", top: 0, width: "100%", justifyContent: "center", alignItems: "center" }}>
+                            <View style={{
+                                backgroundColor: isCreator ? opponentBadge.color : creatorBadge.color,
+                                paddingHorizontal: 20,
+                                paddingVertical: 4,
+                                borderBottomLeftRadius: 10,
+                                borderBottomRightRadius: 10
+                            }}>
+                                <Text style={{ color: "#fff" }}>{isCreator ? opponentBadge.status : creatorBadge.status}</Text>
+                            </View>
+                        </View>
+                        <View style={{ position: "absolute", bottom: 60, width: "100%", left: 10 }}>
+                            <TouchableOpacity onPress={() => handleVote(isCreator ? "opponent" : "creator")} style={{ backgroundColor: "#404151", width: "60%", paddingVertical: 5, borderRadius: 100, paddingHorizontal: 10, flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
+                                <Text style={{ color: "#fff", fontSize: 13 }}>👍 {!isCreator ? streamInfo?.creatorVotes : streamInfo?.opponentVotes} Votes</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 ))}
@@ -419,17 +530,44 @@ const Competition = ({ route }) => {
             {
                 !isHost && isJoined && remoteUids.length > 0 && (
                     <View style={{ display: "flex", backgroundColor: "#1a0b18", justifyContent: "space-between", gap: 10, alignItems: "center", flexDirection: "row" }}>
-                        
-                        <View style={{ borderWidth: 1, borderColor: "blue", overflow: "hidden", width: "50%", height: 300, }}>
+
+                        <View style={{ borderWidth: 1, borderColor: "blue", overflow: "hidden", width: "50%", height: 300, position: "relative" }}>
                             <RtcSurfaceView canvas={{ uid: remoteUids[0], renderMode: 1, mirrorMode: isFrontCamera ? 1 : 0, }} connection={{ channelId: channelName, localUid }} style={{ flex: 1 }} />
+                            <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "#6478ddff", justifyContent: "center", alignItems: "center" }}>
+                                <Text style={{ color: "#fff", fontSize: 14 }}>{streamInfo?.creatorId?.username}</Text>
+                            </View>
+                            <View style={{ position: "absolute", top: 0, width: "100%", justifyContent: "center", alignItems: "center" }}>
+                                <View style={{ backgroundColor: creatorBadge.color, paddingHorizontal: 20, paddingVertical: 4, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 }}>
+                                    <Text style={{ color: "#fff" }}>{creatorBadge.status}</Text>
+                                </View>
+                            </View>
+                            <View style={{ position: "absolute", bottom: 60, width: "100%", left: 10 }}>
+                                <TouchableOpacity onPress={() => handleVote("creator")} style={{ backgroundColor: "#404151", width: "60%", paddingVertical: 5, borderRadius: 100, paddingHorizontal: 10, flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
+                                    <Text style={{ color: "#fff", fontSize: 13 }}>👍 {streamInfo?.creatorVotes} Votes</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <View style={{ borderWidth: 1, borderColor: "red", overflow: "hidden", width: "47%", height: 300, marginRight: 10 }}>
+                        <View style={{ borderWidth: 1, borderColor: "red", overflow: "hidden", width: "47%", height: 300, marginRight: 10, position: "relative" }}>
                             <RtcSurfaceView
                                 key={uid}
-                                canvas={{ uid:remoteUids[1], renderMode: 1 }}
+                                canvas={{ uid: remoteUids[1], renderMode: 1 }}
                                 connection={{ channelId: channelName, localUid }} style={{ flex: 1 }}
                             />
+                            <View style={{ position: "absolute", bottom: 0, width: "100%", height: 50, backgroundColor: "#4D1C2B", justifyContent: "center", alignItems: "center" }}>
+                                <Text style={{ color: "#fff", fontSize: 14 }}>{streamInfo?.opponentId?.username}</Text>
+                            </View>
+                            <View style={{ position: "absolute", top: 0, width: "100%", justifyContent: "center", alignItems: "center" }}>
+                                <View style={{ backgroundColor: opponentBadge.color, paddingHorizontal: 20, paddingVertical: 4, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 }}>
+                                    <Text style={{ color: "#fff" }}>{opponentBadge.status}</Text>
+                                </View>
+                            </View>
+                            <View style={{ position: "absolute", bottom: 60, width: "100%", left: 10 }}>
+                                <TouchableOpacity onPress={() => handleVote("opponent")} style={{ backgroundColor: "#404151", width: "60%", paddingVertical: 5, borderRadius: 100, paddingHorizontal: 10, flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
+                                    <Text style={{ color: "#fff", fontSize: 13 }}>👍 {streamInfo?.opponentVotes} Votes</Text>
+                                </TouchableOpacity>
+                            </View>
+
                         </View>
 
                     </View>
@@ -438,61 +576,46 @@ const Competition = ({ route }) => {
 
 
 
-            {showVersus && (
-                <Animated.Image source={versus} style={[styles.versusImage, { opacity: versusOpacity }]} />
-            )}
+            {
+                showVersus && (
+                    <Animated.Image source={versus} style={[styles.versusImage, { opacity: versusOpacity }]} />
+                )
+            }
 
             <ScrollView style={styles.commentsContainer} showsVerticalScrollIndicator={false}>
                 {comments.map((item, index) => (
-                    <View key={item.id} style={[styles.commentItem]}>
-                        <Image source={{ uri: `https://randomuser.me/api/portraits/men/${index + 1}.jpg` }} style={styles.commentAvatar} />
+                    <View key={index} style={styles.commentItem}>
+                        <Image
+                            source={{ uri: item.userId?.profile || `https://randomuser.me/api/portraits/men/${index + 1}.jpg` }}
+                            style={styles.commentAvatar}
+                        />
                         <View>
-                            <Text style={styles.commentUser}>{item.user}</Text>
-                            <Text style={styles.commentText}>{item.comment}</Text>
+                            <Text style={styles.commentUser}>{item.userId?.username || "User"}</Text>
+                            <Text style={styles.commentText}>{item.message}</Text>
                         </View>
                     </View>
                 ))}
-
-                <ScrollView horizontal contentContainerStyle={{ marginTop: 20 }}>
-                    {
-                        [1, 3, 4, 9].map((i) => (
-                            <View key={i} style={{ marginRight: 20, width: 300, backgroundColor: "#fff", borderRadius: 6, flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, paddingHorizontal: 10 }}>
-                                <Image source={TShirts} style={{ width: 70, height: 70 }} />
-                                <View style={{ flex: 1 }}>
-                                    <Text>Yellow T-Shirt</Text>
-                                    <Text style={{ marginTop: 4 }}>⭐ 4.0 200 sold</Text>
-                                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                                        <Text>$230 <Text style={{ color: "red" }}>$500</Text></Text>
-                                        <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#000", borderRadius: 100, justifyContent: "center", alignItems: "center" }}>
-                                            <Text style={{ color: "#fff", fontSize: 10 }}>Add to cart</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
-                        ))
-                    }
-                </ScrollView>
                 <View style={styles.commentInputBar}>
-                    <View style={styles.cartIconContainer}>
-                        <View style={styles.cartBadge}>
-                            <Text style={styles.cartBadgeText}>2</Text>
-                        </View>
-                        <Ionicons name="cart-outline" size={24} color="#fff" />
-                    </View>
-
-                    <View style={styles.commentInputContainer}>
-                        <TextInput placeholder='Type your comment' style={styles.commentPlaceholder} />
-                    </View>
-
-                    <TouchableOpacity style={styles.sendButton}>
-                        <Ionicons name="send" size={18} color="#fff" />
-                    </TouchableOpacity>
 
                     <TouchableOpacity style={styles.giftButton}>
                         <Ionicons name="gift" size={20} color="#fff" />
                     </TouchableOpacity>
-                </View>
 
+                    <View style={styles.commentInputContainer}>
+                        <TextInput
+                            placeholder='Type your comment'
+                            style={styles.commentPlaceholder}
+                            value={message}
+                            onChangeText={setMessage}
+                            placeholderTextColor={"#c2c2c2ff"}
+                        />
+                    </View>
+
+                    <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+                        <Ionicons name="send" size={18} color="#fff" />
+                    </TouchableOpacity>
+
+                </View>
             </ScrollView>
 
             <View style={styles.actionBar}>
@@ -597,29 +720,33 @@ const Competition = ({ route }) => {
             </Modal>
 
             {/* Animated Perk Message View */}
-            {(perkMessage && !showSlamItem) && (
-                <Animated.View style={[styles.perkMessageContainer, { transform: [{ translateY: perkMessageTranslateY }] }]}>
-                    <Text style={styles.perkMessageText}>{perkMessage}</Text>
-                    <Animated.View style={[styles.perkProgressBar, { width: progressBarWidth }]} />
-                </Animated.View>
-            )}
+            {
+                (perkMessage && !showSlamItem) && (
+                    <Animated.View style={[styles.perkMessageContainer, { transform: [{ translateY: perkMessageTranslateY }] }]}>
+                        <Text style={styles.perkMessageText}>{perkMessage}</Text>
+                        <Animated.View style={[styles.perkProgressBar, { width: progressBarWidth }]} />
+                    </Animated.View>
+                )
+            }
 
-            {showSlamItem && (
-                <Image source={slam_item} style={styles.slamItemImage} />
-            )}
+            {
+                showSlamItem && (
+                    <Image source={slam_item} style={styles.slamItemImage} />
+                )
+            }
 
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView >
 
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, height: 9000 },
+    container: { flex: 1, flexGrow: 1 },
     header: {
-        paddingTop: 60,
+        paddingTop: 20,
         paddingHorizontal: 15,
         backgroundColor: '#1a0b18',
-        maxHeight: 130,
+        maxHeight: 90,
     },
     liveCompText: {
         color: '#fff',
@@ -722,11 +849,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingBottom: 40,
+        paddingBottom: 15,
         backgroundColor: '#1C141D',
         borderTopWidth: 1,
         borderTopColor: '#333',
-        paddingTop: 40,
+        paddingTop: 15,
     },
     actionButton: {
         alignItems: 'center',
@@ -899,7 +1026,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 8,
-        marginTop: 20,
         marginBottom: 40,
     },
 
@@ -942,7 +1068,7 @@ const styles = StyleSheet.create({
     },
 
     commentPlaceholder: {
-        color: '#888',
+        color: '#fff',
     },
 
     sendButton: {
@@ -962,9 +1088,35 @@ const styles = StyleSheet.create({
         backgroundColor: '#2C2C2E',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 10,
+        marginRight: 10,
     },
 
 });
 
 export default Competition;
+
+{/* <ScrollView horizontal contentContainerStyle={{ marginTop: 20 }}>
+    {
+        [1, 3, 4, 9].map((i) => (
+            <View key={i} style={{ marginRight: 20, width: 300, backgroundColor: "#fff", borderRadius: 6, flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, paddingHorizontal: 10 }}>
+                <Image source={TShirts} style={{ width: 70, height: 70 }} />
+                <View style={{ flex: 1 }}>
+                    <Text>Yellow T-Shirt</Text>
+                    <Text style={{ marginTop: 4 }}>⭐ 4.0 200 sold</Text>
+                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                        <Text>$230 <Text style={{ color: "red" }}>$500</Text></Text>
+                        <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#000", borderRadius: 100, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: "#fff", fontSize: 10 }}>Add to cart</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        ))
+    }
+</ScrollView>  */}
+{/* <View style={styles.cartIconContainer}>
+    <View style={styles.cartBadge}>
+        <Text style={styles.cartBadgeText}>2</Text>
+    </View>
+    <Ionicons name="cart-outline" size={24} color="#fff" />
+</View> */}

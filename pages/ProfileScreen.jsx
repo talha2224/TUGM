@@ -179,6 +179,11 @@ const ProfileScreen = () => {
                     <Text style={styles.menuText}>Favourite</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity onPress={() => navigation.navigate('promotion')} style={styles.menuItem}>
+                    <Feather name="speaker" size={25} color="white" />
+                    <Text style={styles.menuText}>Promotions & Coupons</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity onPress={() => navigation.navigate('shipments')} style={styles.menuItem}>
                     <Feather name="truck" size={20} color="white" />
                     <Text style={styles.menuText}>Shipments</Text>
