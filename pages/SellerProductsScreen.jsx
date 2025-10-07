@@ -92,7 +92,7 @@ const SellerProductsScreen = () => {
                                         <Text style={{ color: "#fff", fontSize: 16, marginTop: 3 }}>${i?.price}</Text>
                                     </View>
 
-                                    <TouchableOpacity style={[styles.cancelButton, { backgroundColor: "#fff", width: 120 }]}>
+                                    <TouchableOpacity style={[styles.cancelButton, { backgroundColor: "#fff" }]}>
                                         <Text style={[styles.cancelText, { color: "#000" }]}>Update product</Text>
                                     </TouchableOpacity>
                                 </View>

@@ -23,7 +23,7 @@ const ProfileScreen = () => {
     const [sellerMode, setSellerMode] = useState(false);
 
     const menuItems = [
-        { icon: <Feather name="user" size={20} color="white" />, text: 'Edit profile' },
+        // { icon: <Feather name="user" size={20} color="white" />, text: 'Edit profile' },
         { icon: <Feather name="repeat" size={20} color="white" />, text: 'Transaction' },
         { icon: <Feather name="credit-card" size={20} color="white" />, text: 'My wallet' },
         { icon: <Feather name="clock" size={20} color="white" />, text: 'History' },

@@ -183,7 +183,7 @@ const AuctionListingScreen = () => {
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardList}>
                                             {streams?.map((stream, index) => (
                                                 <TouchableOpacity onPress={() => { navigation.navigate("CreatorStream", { streamId: stream?.streamId,isHost:false }) }} key={stream?._id} style={styles.card}>
-                                                    <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage }} style={styles.cardImage} blurRadius={4} />
+                                                    <Image source={{ uri: stream?.coverImage || stream?.creatorId?.profile }} style={styles.cardImage} blurRadius={4} />
                                                     <View style={styles.cardOverlay}>
                                                         <View style={styles.profileContainer}>
                                                             <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage  }} style={styles.profileImage} />

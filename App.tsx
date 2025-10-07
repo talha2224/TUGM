@@ -50,7 +50,7 @@ export default function App() {
       <PersistGate loading={null} persistor={persistor}>
         <StripeProvider publishableKey="pk_test_51OjJpTASyMRcymO6x2PBK1nrHChycNMNXj7HHvTRffOp5xufCj3WRSCLoep1tGp5Ilx3IWj7ck5yqrwEH8VSRKn80055Kvyelu">
           <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
+            <Stack.Navigator initialRouteName="Onboarding"  screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
               <Stack.Screen name="Default" component={DefaultScreen} />
               <Stack.Screen name="Onboarding" component={OnboardingScreen} />
               <Stack.Screen name="Login" component={LoginScreen} />

@@ -150,7 +150,7 @@ const CreateStreamScreen = () => {
                     <Text style={{ color: "#fff" }}>{data?.image ? "Image Picked" : "Pick Stream Cover Image"}</Text>
                 </TouchableOpacity>
 
-                <TextInput defaultValue='1' onChangeText={(text) => setData({ ...data, startingBid: text })} keyboardType='numeric' placeholderTextColor={"grey"} placeholder='Starting Bid' style={{ borderRadius: 5, paddingVertical: 7, paddingHorizontal: 10, marginVertical: 10, backgroundColor: "#1A1A1A" }} />
+                <TextInput defaultValue='1' onChangeText={(text) => setData({ ...data, startingBid: text })} keyboardType='numeric' placeholderTextColor={"grey"} placeholder='Starting Bid' style={{ borderRadius: 5, paddingVertical: 7, paddingHorizontal: 10, marginVertical: 10, backgroundColor: "#1A1A1A",color:"white" }} />
                 <View style={styles.timeContainer}>
                     <Text style={styles.inputLabel}>Time</Text>
                     <ScrollView showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={styles.timeOptionsContainer}>

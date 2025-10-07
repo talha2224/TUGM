@@ -45,6 +45,8 @@ const CalendarScreen = () => {
         navigation.navigate("competitions/settings")
     };
 
+    console.log(streams)
+
     return (
         <GestureHandlerRootView style={styles.container}>
 
@@ -59,7 +61,7 @@ const CalendarScreen = () => {
 
                 <View style={styles.btnContainer}>
                     <TouchableOpacity style={[styles.tabButton, activeTab === 'Auctions' && styles.activeTab]} onPress={() => handleTabPress('Auctions')}>
-                        <Text style={[styles.tabText, styles?.activeTab]}>Events</Text>
+                        <Text style={[styles.tabText, styles?.activeTab]}>Battle Arena</Text>
                     </TouchableOpacity>
 
                     {/* Updated TouchableOpacity for See More */}
@@ -86,10 +88,10 @@ const CalendarScreen = () => {
                         <View style={styles.cardList}>
                             {streams?.map((stream, index) => (
                                 <TouchableOpacity onPress={() => { navigation.navigate("competition", { streamId: stream?.streamId, isHost: false }) }} key={index} style={styles.card}>
-                                    <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage }} style={styles.cardImage} blurRadius={4} />
+                                    <Image source={{ uri: stream?.coverImage || stream?.creatorId?.profile }} style={styles.cardImage} blurRadius={4} />
                                     <View style={styles.cardOverlay}>
                                         <View style={styles.profileContainer}>
-                                            <Image source={{ uri: stream?.creatorId?.profile || stream?.creatorId?.coverImage }} style={styles.profileImage} />
+                                            <Image source={{ uri: stream?.coverImage || stream?.creatorId?.profile }} style={styles.profileImage} />
                                             <Text style={styles.profileName}>{stream?.creatorId?.username}</Text>
                                         </View>
                                         <Text style={styles.upcomingText}>Live</Text>
@@ -119,14 +121,14 @@ const CalendarScreen = () => {
                             <AntDesign name="camera" size={17} color="#fff" style={styles.modalIcon} />
                             <Text style={styles.modalText}>LIVE Auction</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Live Competition')}>
+                        {/* <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Live Competition')}>
                             <MaterialCommunityIcons name="trophy-variant-outline" size={17} color="#fff" style={styles.modalIcon} />
                             <Text style={styles.modalText}>LIVE Competition</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Schedule a show')}>
                             <Ionicons name="play-circle-outline" size={17} color="#fff" style={styles.modalIcon} />
                             <Text style={styles.modalText}>Schedule a show</Text>
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
                     </Pressable>
                 </Pressable>
             </Modal>

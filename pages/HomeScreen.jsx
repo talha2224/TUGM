@@ -395,7 +395,7 @@ const HomeScreen = () => {
                             ))}
                         </ScrollView>
 
-                        <Pressable onPress={uploadStory} style={[styles.closeButton, { backgroundColor: "green" }]}>
+                        <Pressable onPress={uploadStory} style={[styles.closeButton, { backgroundColor: "#1A1A1A" }]}>
                             <Text style={styles.closeButtonText}>Upload Story</Text>
                         </Pressable>
 

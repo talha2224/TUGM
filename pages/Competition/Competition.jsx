@@ -849,11 +849,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingBottom: 15,
+        height: 150,
         backgroundColor: '#1C141D',
         borderTopWidth: 1,
         borderTopColor: '#333',
-        paddingTop: 15,
     },
     actionButton: {
         alignItems: 'center',

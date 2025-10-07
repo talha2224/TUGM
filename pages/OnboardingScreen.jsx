@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, ImageBackground, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import image1 from '../assets/login-1.png';
 import image2 from '../assets/login-2.png';
 import image3 from '../assets/login-3.png';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const onboardingData = [
     {
@@ -28,12 +29,12 @@ const OnboardingScreen = () => {
     const [currentScreen, setCurrentScreen] = useState(0);
     const { width, height } = Dimensions.get('window');
     const translateX = useRef(new Animated.Value(0)).current;
-    const navigation = useNavigation(); // Use React Navigation
+    const navigation = useNavigation();
 
     const nextScreen = () => {
         if (currentScreen < onboardingData.length - 1) {
-            Animated.timing(translateX, {toValue: -(currentScreen + 1) * width,duration: 300,useNativeDriver: true,}).start(() => {setCurrentScreen(currentScreen + 1);});
-        } 
+            Animated.timing(translateX, { toValue: -(currentScreen + 1) * width, duration: 300, useNativeDriver: true, }).start(() => { setCurrentScreen(currentScreen + 1); });
+        }
         else {
             navigation.replace('Login');
         }
@@ -42,6 +43,17 @@ const OnboardingScreen = () => {
     const skipOnboarding = () => {
         navigation.replace('Login');
     };
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            let userId = await AsyncStorage.getItem('userId');
+            if (userId?.length > 0) {
+                navigation.replace('Home');
+                return;
+            }
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, []);
 
     return (
         <View style={styles.container}>
