@@ -1,9 +1,9 @@
 // const config = {
-//     baseUrl: "http://192.168.100.10:3001/api/v1",
-//     baseUrl2: "http://192.168.100.10:3001/api/v1",
-//     baseUrl3: "http://192.168.100.10:3001/api/v1",
-//     baseUrl4: "http://192.168.100.10:3001/api/v1",
-//     socketUrl: "http://192.168.100.10:3001",
+//     baseUrl: "http://192.168.100.66:3001/api/v1",
+//     baseUrl2: "http://192.168.100.66:3001/api/v1",
+//     baseUrl3: "http://192.168.100.66:3001/api/v1",
+//     baseUrl4: "http://192.168.100.66:3001/api/v1",
+//     socketUrl: "http://192.168.100.66:3001",
 //     appId: "7235a8177bd74d14a5d615df38e6fcf5"
 // }
 const config = {

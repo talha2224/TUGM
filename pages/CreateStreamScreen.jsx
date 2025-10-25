@@ -10,11 +10,6 @@ import config from "../config";
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
-
-const dressImages = [
-    "https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/1183266/pexels-photo-1183266.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-];
 const timeOptions = ['5s', '10s', '15s', '20s', '25s', '30s', '40s', '50s', '1m'];
 const tabs = ["Auction", "Buy Now", "Giveaway", "Sold", "Offers", "Tips"];
 
@@ -22,7 +17,11 @@ const tabs = ["Auction", "Buy Now", "Giveaway", "Sold", "Offers", "Tips"];
 const CreateStreamScreen = () => {
     const navigation = useNavigation();
 
-    const [data, setData] = useState({ startingBid:1, productId: "", image: null })
+    const [data, setData] = useState({
+        startingBid: 1,
+        productId: [], // ✅ array for multi-select
+        image: null
+    });
     const [categories, setCategories] = useState([])
     const [products, setProducts] = useState([])
 
@@ -80,36 +79,50 @@ const CreateStreamScreen = () => {
 
     const handleStartStream = async () => {
         let creatorId = await AsyncStorage.getItem('userId');
-        if(!data.startingBid || data?.productId?.length<=0 || !data?.image){
+
+        if (!data.startingBid || data.productId.length === 0 || !data.image) {
             ToastAndroid.show('All Fields Are Required!', ToastAndroid.SHORT);
+            return;
         }
+
         const formData = new FormData();
         formData.append("startingBid", data.startingBid);
-        formData.append("productId", data.productId);
         formData.append("creatorId", creatorId);
 
-        if (data?.image) {
-            formData.append("image", { uri: data.image, name: "product.jpg", type: "image/jpeg", });
+        // ✅ append each selected productId
+        data.productId.forEach((id) => formData.append("productId[]", id));
+
+        if (data.image) {
+            formData.append("image", {
+                uri: data.image,
+                name: "product.jpg",
+                type: "image/jpeg",
+            });
         }
 
         try {
             ToastAndroid.show('Creating Stream!', ToastAndroid.SHORT);
-            let res = await axios.post(`${config.baseUrl}/stream/create`, formData, { headers: { 'Content-Type': 'multipart/form-data' }, });
+            const res = await axios.post(`${config.baseUrl}/stream/create`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
             if (res?.data?.data) {
                 ToastAndroid.show('Stream Created!', ToastAndroid.SHORT);
-                await AsyncStorage.setItem('streamId',res?.data?.data?._id)
+                await AsyncStorage.setItem('streamId', res.data.data._id);
                 setTimeout(() => {
-                    navigation.replace("CreatorStream", { streamId: res?.data?.data.streamId,isHost:true});
+                    navigation.replace("CreatorStream", {
+                        streamId: res.data.data.streamId,
+                        isHost: true,
+                    });
                 }, 3000);
             }
-
-        }
-        catch (error) {
-            console.log("Error creating stream: ", error);
+        } catch (error) {
+            console.log("Error creating stream:", error);
         }
     };
 
-    
+
+
 
     useEffect(() => {
         fetchCategory();
@@ -150,7 +163,7 @@ const CreateStreamScreen = () => {
                     <Text style={{ color: "#fff" }}>{data?.image ? "Image Picked" : "Pick Stream Cover Image"}</Text>
                 </TouchableOpacity>
 
-                <TextInput defaultValue='1' onChangeText={(text) => setData({ ...data, startingBid: text })} keyboardType='numeric' placeholderTextColor={"grey"} placeholder='Starting Bid' style={{ borderRadius: 5, paddingVertical: 7, paddingHorizontal: 10, marginVertical: 10, backgroundColor: "#1A1A1A",color:"white" }} />
+                <TextInput defaultValue='1' onChangeText={(text) => setData({ ...data, startingBid: text })} keyboardType='numeric' placeholderTextColor={"grey"} placeholder='Starting Bid' style={{ borderRadius: 5, paddingVertical: 7, paddingHorizontal: 10, marginVertical: 10, backgroundColor: "#1A1A1A", color: "white" }} />
                 <View style={styles.timeContainer}>
                     <Text style={styles.inputLabel}>Time</Text>
                     <ScrollView showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={styles.timeOptionsContainer}>
@@ -265,64 +278,160 @@ const CreateStreamScreen = () => {
             </Modal>
 
             {/* onRequestClose={() => setIsStoreVisible(false)} */}
-            <Modal animationType="slide" transparent={true} visible={isStoreVisible}>
-                {/* <Pressable onPress={() => setIsStoreVisible(false)} style={styles.modalOverlay}> */}
+            <Modal animationType="slide" transparent visible={isStoreVisible}>
+                <Pressable
+                    onPress={() => setIsStoreVisible(false)}
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        justifyContent: 'flex-end',
+                    }}
+                >
+                    {/* This inner Pressable prevents closing when tapping inside */}
+                    <Pressable style={{ maxHeight: '80%' }} onPress={() => { }}>
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            style={{
+                                backgroundColor: '#0c0b0bff',
+                                borderTopLeftRadius: 20,
+                                borderTopRightRadius: 20,
+                                padding: 20,
+                            }}
+                        >
+                            <Text style={{ color: 'white', fontSize: 16 }}>Live listings</Text>
 
-                    <ScrollView showsVerticalScrollIndicator={false} style={styles?.modalContent2}>
+                            <View
+                                style={{
+                                    backgroundColor: '#1A1A1A',
+                                    borderRadius: 10,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 2,
+                                    marginVertical: 10,
+                                }}
+                            >
+                                <Ionicons name="search" size={20} color="gray" />
+                                <TextInput placeholder="Search for products" placeholderTextColor="gray" />
+                            </View>
 
-                        <Text style={{ color: "white", fontSize: 16 }}>Live listings</Text>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.categoryContainer}
+                            >
+                                {categories?.map((category) => (
+                                    <TouchableOpacity
+                                        key={category?._id}
+                                        style={[
+                                            styles.button,
+                                            activeCategory === category?.category && styles.activeButton,
+                                        ]}
+                                        onPress={() => handleCategoryPress(category?.category)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.buttonText,
+                                                activeCategory !== category?.category && styles.inActiveButtonText,
+                                            ]}
+                                        >
+                                            {category?.category}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
 
-                        <View style={{ backgroundColor: '#1A1A1A', borderRadius: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 2, marginVertical: 10 }}>
-                            <Ionicons name="search" size={20} color="gray" />
-                            <TextInput placeholder="Search for products" placeholderTextColor="gray" />
-                        </View>
+                            <Text style={{ color: 'white', fontSize: 16, marginTop: 10 }}>My Store</Text>
 
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryContainer}>
-                            {categories?.map((category) => (
-                                <TouchableOpacity key={category?._id} style={[styles.button, activeCategory === category?.category && styles.activeButton,]} onPress={() => handleCategoryPress(category?.category)}>
-                                    <Text style={[styles.buttonText, activeCategory !== category?.category && styles.inActiveButtonText]}>{category?.category}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-
-                        <Text style={{ color: "white", fontSize: 16, marginTop: 10 }}>My Store</Text>
-
-                        {
-                            products?.map((i) => (
-                                <View key={i._id} style={{ padding: 10, backgroundColor: '#1A1A1A', borderRadius: 10, marginVertical: 10, }}>
-
-                                    <View style={{ flexDirection: "row", alignItems: "flex-start", borderBottomWidth: 2, borderBottomColor: "#494848", paddingBottom: 20 }}>
-
-                                        <Image source={{ uri: i.image }} alt='img' style={{ width: 70, height: 70, borderRadius: 10 }} />
+                            {products?.map((i) => (
+                                <View
+                                    key={i._id}
+                                    style={{
+                                        padding: 10,
+                                        backgroundColor: '#1A1A1A',
+                                        borderRadius: 10,
+                                        marginVertical: 10,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'flex-start',
+                                            borderBottomWidth: 2,
+                                            borderBottomColor: '#494848',
+                                            paddingBottom: 20,
+                                        }}
+                                    >
+                                        <Image
+                                            source={{ uri: i.images[0] }}
+                                            style={{ width: 70, height: 70, borderRadius: 10 }}
+                                        />
                                         <View style={{ marginLeft: 10 }}>
-                                            <Text style={{ color: "#fff", fontSize: 12 }}>{i.title}</Text>
-                                            <Text style={{ color: "#c4c4c4", fontSize: 12, marginTop: 8 }}>QTY: {i?.stock}</Text>
-                                            <Text style={{ color: "#fff", fontSize: 12, marginTop: 8 }}>${i.price}</Text>
+                                            <Text style={{ color: '#fff', fontSize: 12 }}>{i.title}</Text>
+                                            <Text style={{ color: '#c4c4c4', fontSize: 12, marginTop: 8 }}>
+                                                QTY: {i?.stock}
+                                            </Text>
+                                            <Text style={{ color: '#fff', fontSize: 12, marginTop: 8 }}>
+                                                ${i.price}
+                                            </Text>
                                         </View>
-
                                     </View>
 
-                                    <View style={{ justifyContent: "space-between", alignItems: "center", flexDirection: "row", marginTop: 15 }}>
+                                    <View
+                                        style={{
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            flexDirection: 'row',
+                                            marginTop: 15,
+                                        }}
+                                    >
                                         <View>
-                                            {/* <Text style={{ color: "#c4c4c4", fontSize: 12 }}>0 Bid</Text> */}
-                                            <Text style={{ color: "#fff", fontSize: 16, marginTop: 3 }}>${i.price}</Text>
+                                            <Text style={{ color: '#fff', fontSize: 16, marginTop: 3 }}>
+                                                ${i.price}
+                                            </Text>
                                         </View>
 
-                                        <TouchableOpacity onPress={() => {setData({ ...data, productId: i?._id });setIsStoreVisible(false)}} style={{ backgroundColor: i?._id == data?.productId ? "#FFA500" : "#fff", width: 120, borderWidth: 1, borderRadius: 25, padding: 10, alignItems: "center", }}>
-                                            <Text style={[styles.cancelText, { color: i?._id == data?.productId ? "#fff" : "#000" }]}>{i?._id == data?.productId ? "Selected" : "Select Product"}</Text>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                const alreadySelected = data.productId.includes(i._id);
+                                                let updatedProducts;
+
+                                                if (alreadySelected) {
+                                                    updatedProducts = data.productId.filter((id) => id !== i._id);
+                                                } else {
+                                                    updatedProducts = [...data.productId, i._id];
+                                                }
+
+                                                setData({ ...data, productId: updatedProducts });
+                                            }}
+                                            style={{
+                                                backgroundColor: data.productId.includes(i._id)
+                                                    ? '#FFA500'
+                                                    : '#fff',
+                                                width: 120,
+                                                borderWidth: 1,
+                                                borderRadius: 25,
+                                                padding: 10,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color: data.productId.includes(i._id) ? '#fff' : '#000',
+                                                }}
+                                            >
+                                                {data.productId.includes(i._id)
+                                                    ? 'Selected'
+                                                    : 'Select Product'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
-
                                 </View>
-                            ))
-                        }
-
-
-                    </ScrollView>
-
-                {/* </Pressable> */}
+                            ))}
+                        </ScrollView>
+                    </Pressable>
+                </Pressable>
             </Modal>
-
 
 
             <BottomNavBar />

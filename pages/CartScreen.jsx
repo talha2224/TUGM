@@ -14,8 +14,6 @@ const CartScreen = () => {
 
     const navigation = useNavigation();
     const [couponCode, setCouponCode] = useState('');
-    const [quantity, setQuantity] = useState(1);
-
     const subtotal = 30.00;
     const deliveryFees = 7.50;
     const total = products.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -42,8 +40,6 @@ const CartScreen = () => {
     const handleCheckout = () => {
         navigation.navigate("checkout")
     };
-
-    console.log(products, 'products')
 
     return (
         <View style={styles.container}>

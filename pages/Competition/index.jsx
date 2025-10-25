@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Modal, Pressable, Image, ToastAndroid, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Modal, Pressable, Image, ToastAndroid, Platform, KeyboardAvoidingView } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import AntDesign from 'react-native-vector-icons/AntDesign';
@@ -21,6 +21,10 @@ const CompetitionsSettings = () => {
     const [thumbAsset, setThumbAsset] = useState(null);
     const [videoAsset, setVideoAsset] = useState(null);
     const [creating, setCreating] = useState(false);
+    const [products, setProducts] = useState([])
+    const [isStoreVisible, setIsStoreVisible] = useState(false);
+    const [data, setData] = useState({ startingBid: 1, productIds: [], image: null });
+
 
     const filteredOpponents = useMemo(() => {
         const q = searchOpponentText.trim().toLowerCase();
@@ -81,6 +85,19 @@ const CompetitionsSettings = () => {
         return true;
     };
 
+    const fetchProduct = async () => {
+        let userId = await AsyncStorage.getItem('userId');
+        try {
+            let res = await axios.get(`${config.baseUrl}/product/user/${userId}`)
+            if (res?.data) {
+                setProducts(res?.data?.data);
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    }
+
     const createBattle = async () => {
         if (!validate()) return;
         try {
@@ -89,6 +106,7 @@ const CompetitionsSettings = () => {
             form.append('name', competitionName.trim());
             form.append('creatorId', await AsyncStorage.getItem('userId'));
             form.append('opponentId', String(selectedOpponent._id));
+            data.productIds.forEach(id => form.append('productId[]', id));
             const fileToSend = thumbAsset;
             if (fileToSend) {
                 form.append('image', {
@@ -100,12 +118,12 @@ const CompetitionsSettings = () => {
             const res = await axios.post(`${config.baseUrl}/battle/create`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
             if (res?.data?.data?._id) {
                 ToastAndroid.show('Battle Created', ToastAndroid.SHORT);
-                navigation.replace("competition", { streamId: res?.data?.data.streamId,isHost:true});
+                navigation.replace("competition", { streamId: res?.data?.data.streamId, isHost: true });
             } else {
                 ToastAndroid.show('Failed to create battle', ToastAndroid.SHORT);
             }
         } catch (e) {
-            console.log(e,'error')
+            console.log(e, 'error')
             ToastAndroid.show(e?.response?.data?.error || 'Error creating battle', ToastAndroid.LONG);
         } finally {
             setCreating(false);
@@ -113,127 +131,251 @@ const CompetitionsSettings = () => {
     };
 
     useEffect(() => {
+        fetchProduct()
         fetchAllOpponents();
     }, []);
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Competition settings</Text>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <AntDesign name="close" size={24} color="#fff" />
-                </TouchableOpacity>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "padding"}
+            style={{ flex: 1, backgroundColor: "black" }}
+        >
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Competition settings</Text>
+                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                        <AntDesign name="close" size={24} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollViewContent}>
+                    <Text style={styles.label}>Name your competition</Text>
+                    <TextInput style={styles.input} placeholder="Enter competition name" placeholderTextColor="#666" value={competitionName} onChangeText={setCompetitionName} />
+
+                    <Text style={styles.label}>Add opponent</Text>
+                    <TouchableOpacity onPress={() => setIsAddOpponentModalVisible(true)} style={styles.addOpponentContainer}>
+                        {selectedOpponent ? (
+                            <View style={styles.selectedOpponentPill}>
+                                <Image source={{ uri: selectedOpponent.profile }} style={styles.selectedOpponentAvatar} />
+                                <Text style={styles.selectedOpponentText}>@{String(selectedOpponent.username || '').replace(/\s/g, '_').toLowerCase()}</Text>
+                                <TouchableOpacity onPress={handleRemoveOpponent} style={styles.removeOpponentButton}>
+                                    <AntDesign name="closecircle" size={16} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <TouchableOpacity style={styles.addOpponentButton} onPress={() => setIsAddOpponentModalVisible(true)}>
+                                <Feather name="user-plus" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => setIsAddOpponentModalVisible(true)}>
+                            <MaterialCommunityIcons name="account-group-outline" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+
+                    <Text style={styles.label}>Media</Text>
+                    <Text style={styles.subLabel}>Add a thumbnail and Battle ready prep screen with your intros.</Text>
+                    <View style={styles.mediaContainer}>
+                        <View style={styles.mediaOption}>
+                            <TouchableOpacity style={[styles.mediaButton, thumbAsset ? styles.mediaSelected : null]} onPress={() => pickMedia('photo')}>
+                                {thumbAsset ? <Image source={{ uri: thumbAsset.uri }} style={styles.preview} /> : <Feather name="camera" size={24} color="#fff" />}
+                                <Text style={styles.mediaButtonText}>{thumbAsset ? 'Thumbnail Selected' : 'Add a Thumbnail'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.mediaOption}>
+                            <TouchableOpacity style={[styles.mediaButton, videoAsset ? styles.mediaSelected : null]} onPress={() => pickMedia('video')}>
+                                <Ionicons name="play-circle-outline" size={24} color="#fff" />
+                                <Text style={styles.mediaButtonText}>{videoAsset ? 'Video Selected' : 'Prep video intros'}</Text>
+                                <Text style={styles.mediaTime}>{videoAsset ? '' : '01:00'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <Text style={styles.label}>Add Product</Text>
+                    <TouchableOpacity onPress={() => setIsStoreVisible(!isStoreVisible)} style={styles.viewStoreButton}>
+                        <Text style={{ color: "white" }}>Select Product For Auction</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.perksContainer}>
+                        <View>
+                            <Text style={styles.label}>Allow Perks</Text>
+                            <Text style={styles.subLabel}>You can use 1-2 perks per competition.</Text>
+                        </View>
+                        <Switch trackColor={{ false: "#767577", true: "#F78E1B" }} thumbColor={allowPerks ? "#f4f3f4" : "#f4f3f4"} ios_backgroundColor="#3e3e3e" onValueChange={setAllowPerks} value={allowPerks} />
+                    </View>
+
+                    <Text style={styles.label}>Primary Category</Text>
+                    <Text style={styles.subLabel}>Accurately categorizing your show will help to increase</Text>
+                    <TouchableOpacity style={styles.categoryButton}>
+                        <TextInput placeholder='Category' placeholderTextColor={"white"} style={{ flex: 1, border: "none" }} />
+                        <Ionicons name="chevron-forward" size={20} color="#666" />
+                    </TouchableOpacity>
+
+                    <View style={styles.actionButtonsContainer}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton} disabled={creating}>
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={createBattle} style={styles.goLiveButton} disabled={creating}>
+                            <Text style={styles.goLiveButtonText}>{creating ? 'Creating...' : 'Go LIVE'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+
+                <Modal animationType="slide" transparent={true} visible={isAddOpponentModalVisible} onRequestClose={() => setIsAddOpponentModalVisible(false)}>
+                    <Pressable style={styles.modalBackground} onPress={() => setIsAddOpponentModalVisible(false)}>
+                        <Pressable style={styles.addOpponentModalView}>
+                            <TouchableOpacity style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Add your opponent</Text>
+                                <TouchableOpacity onPress={() => setIsAddOpponentModalVisible(false)}>
+                                    <AntDesign name="close" size={24} color="#fff" />
+                                </TouchableOpacity>
+                            </TouchableOpacity>
+
+                            <View style={styles.modalSearchBar}>
+                                <Ionicons name="search" size={20} color="gray" style={styles.modalSearchIcon} />
+                                <TextInput style={styles.modalSearchInput} placeholder="Search for opponent" placeholderTextColor="gray" value={searchOpponentText} onChangeText={setSearchOpponentText} />
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false} style={styles.opponentList}>
+                                {filteredOpponents.map((opponent) => {
+                                    const isSelected = selectedOpponent?._id === opponent._id;
+                                    return (
+                                        <TouchableOpacity key={opponent._id} style={styles.opponentItem} onPress={() => handleSelectOpponent(opponent)}>
+                                            <Image source={{ uri: opponent.profile }} style={styles.opponentAvatar} />
+                                            <View style={styles.opponentInfo}>
+                                                <Text style={styles.opponentName}>{opponent.username}</Text>
+                                                <Text style={styles.opponentFollowers}>{opponent.email}</Text>
+                                                {opponent.isOnline ? <Text style={styles.opponentStatus}>Online</Text> : null}
+                                            </View>
+                                            {isSelected ? (
+                                                <AntDesign name="checkcircle" size={24} color="#F78E1B" />
+                                            ) : (
+                                                <TouchableOpacity style={styles.inviteButton} onPress={() => handleSelectOpponent(opponent)}>
+                                                    <Text style={styles.inviteButtonText}>Invite</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </Pressable>
+                    </Pressable>
+                </Modal>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollViewContent}>
-                <Text style={styles.label}>Name your competition</Text>
-                <TextInput style={styles.input} placeholder="Enter competition name" placeholderTextColor="#666" value={competitionName} onChangeText={setCompetitionName} />
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isStoreVisible}
+                onRequestClose={() => setIsStoreVisible(false)}
+            >
+                <Pressable
+                    onPress={() => setIsStoreVisible(false)} // 👈 Tap outside closes modal
+                    style={{
+                        flex: 1,
+                        justifyContent: "flex-end",
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                    }}
+                >
+                    <Pressable
+                        onPress={(e) => e.stopPropagation()} // 👈 Prevent closing when tapping inside content
+                        style={{
+                            backgroundColor: '#0c0b0bff',
+                            borderTopLeftRadius: 20,
+                            borderTopRightRadius: 20,
+                            padding: 20,
+                            paddingBottom: 40,
+                            maxHeight: 600,
+                        }}
+                    >
+                        <Text style={{ color: "white", fontSize: 16, marginTop: 10 }}>My Store</Text>
 
-                <Text style={styles.label}>Add opponent</Text>
-                <TouchableOpacity onPress={() => setIsAddOpponentModalVisible(true)} style={styles.addOpponentContainer}>
-                    {selectedOpponent ? (
-                        <View style={styles.selectedOpponentPill}>
-                            <Image source={{ uri: selectedOpponent.profile }} style={styles.selectedOpponentAvatar} />
-                            <Text style={styles.selectedOpponentText}>@{String(selectedOpponent.username || '').replace(/\s/g, '_').toLowerCase()}</Text>
-                            <TouchableOpacity onPress={handleRemoveOpponent} style={styles.removeOpponentButton}>
-                                <AntDesign name="closecircle" size={16} color="#fff" />
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <TouchableOpacity style={styles.addOpponentButton} onPress={() => setIsAddOpponentModalVisible(true)}>
-                            <Feather name="user-plus" size={20} color="#fff" />
-                        </TouchableOpacity>
-                    )}
-                    <TouchableOpacity onPress={() => setIsAddOpponentModalVisible(true)}>
-                        <MaterialCommunityIcons name="account-group-outline" size={24} color="#fff" />
-                    </TouchableOpacity>
-                </TouchableOpacity>
-
-                <Text style={styles.label}>Media</Text>
-                <Text style={styles.subLabel}>Add a thumbnail and Battle ready prep screen with your intros.</Text>
-                <View style={styles.mediaContainer}>
-                    <View style={styles.mediaOption}>
-                        <TouchableOpacity style={[styles.mediaButton, thumbAsset ? styles.mediaSelected : null]} onPress={() => pickMedia('photo')}>
-                            {thumbAsset ? <Image source={{ uri: thumbAsset.uri }} style={styles.preview} /> : <Feather name="camera" size={24} color="#fff" />}
-                            <Text style={styles.mediaButtonText}>{thumbAsset ? 'Thumbnail Selected' : 'Add a Thumbnail'}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.mediaOption}>
-                        <TouchableOpacity style={[styles.mediaButton, videoAsset ? styles.mediaSelected : null]} onPress={() => pickMedia('video')}>
-                            <Ionicons name="play-circle-outline" size={24} color="#fff" />
-                            <Text style={styles.mediaButtonText}>{videoAsset ? 'Video Selected' : 'Prep video intros'}</Text>
-                            <Text style={styles.mediaTime}>{videoAsset ? '' : '01:00'}</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.optionalText}>Optional</Text>
-                    </View>
-                </View>
-
-                <View style={styles.perksContainer}>
-                    <View>
-                        <Text style={styles.label}>Allow Perks</Text>
-                        <Text style={styles.subLabel}>You can use 1-2 perks per competition.</Text>
-                    </View>
-                    <Switch trackColor={{ false: "#767577", true: "#F78E1B" }} thumbColor={allowPerks ? "#f4f3f4" : "#f4f3f4"} ios_backgroundColor="#3e3e3e" onValueChange={setAllowPerks} value={allowPerks} />
-                </View>
-
-                <Text style={styles.label}>Primary Category</Text>
-                <Text style={styles.subLabel}>Accurately categorizing your show will help to increase</Text>
-                <TouchableOpacity style={styles.categoryButton}>
-                    <Text style={styles.categoryButtonText}>Category</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#666" />
-                </TouchableOpacity>
-
-                <View style={styles.actionButtonsContainer}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton} disabled={creating}>
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={createBattle} style={styles.goLiveButton} disabled={creating}>
-                        <Text style={styles.goLiveButtonText}>{creating ? 'Creating...' : 'Go LIVE'}</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-
-            <Modal animationType="slide" transparent={true} visible={isAddOpponentModalVisible} onRequestClose={() => setIsAddOpponentModalVisible(false)}>
-                <Pressable style={styles.modalBackground} onPress={() => setIsAddOpponentModalVisible(false)}>
-                    <Pressable style={styles.addOpponentModalView}>
-                        <TouchableOpacity style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Add your opponent</Text>
-                            <TouchableOpacity onPress={() => setIsAddOpponentModalVisible(false)}>
-                                <AntDesign name="close" size={24} color="#fff" />
-                            </TouchableOpacity>
-                        </TouchableOpacity>
-
-                        <View style={styles.modalSearchBar}>
-                            <Ionicons name="search" size={20} color="gray" style={styles.modalSearchIcon} />
-                            <TextInput style={styles.modalSearchInput} placeholder="Search for opponent" placeholderTextColor="gray" value={searchOpponentText} onChangeText={setSearchOpponentText} />
-                        </View>
-
-                        <ScrollView showsVerticalScrollIndicator={false} style={styles.opponentList}>
-                            {filteredOpponents.map((opponent) => {
-                                const isSelected = selectedOpponent?._id === opponent._id;
-                                return (
-                                    <TouchableOpacity key={opponent._id} style={styles.opponentItem} onPress={() => handleSelectOpponent(opponent)}>
-                                        <Image source={{ uri: opponent.profile }} style={styles.opponentAvatar} />
-                                        <View style={styles.opponentInfo}>
-                                            <Text style={styles.opponentName}>{opponent.username}</Text>
-                                            <Text style={styles.opponentFollowers}>{opponent.email}</Text>
-                                            {opponent.isOnline ? <Text style={styles.opponentStatus}>Online</Text> : null}
+                        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10 }}>
+                            {products?.map((i) => (
+                                <View
+                                    key={i._id}
+                                    style={{
+                                        padding: 10,
+                                        backgroundColor: '#1A1A1A',
+                                        borderRadius: 10,
+                                        marginVertical: 10,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            flexDirection: "row",
+                                            alignItems: "flex-start",
+                                            borderBottomWidth: 2,
+                                            borderBottomColor: "#494848",
+                                            paddingBottom: 20,
+                                        }}
+                                    >
+                                        <Image
+                                            source={{ uri: i?.images[0] }}
+                                            style={{ width: 70, height: 70, borderRadius: 10 }}
+                                        />
+                                        <View style={{ marginLeft: 10 }}>
+                                            <Text style={{ color: "#fff", fontSize: 12 }}>{i.title}</Text>
+                                            <Text style={{ color: "#c4c4c4", fontSize: 12, marginTop: 8 }}>
+                                                QTY: {i?.stock}
+                                            </Text>
+                                            <Text style={{ color: "#fff", fontSize: 12, marginTop: 8 }}>
+                                                ${i.price}
+                                            </Text>
                                         </View>
-                                        {isSelected ? (
-                                            <AntDesign name="checkcircle" size={24} color="#F78E1B" />
-                                        ) : (
-                                            <TouchableOpacity style={styles.inviteButton} onPress={() => handleSelectOpponent(opponent)}>
-                                                <Text style={styles.inviteButtonText}>Invite</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
+                                    </View>
+
+                                    <View
+                                        style={{
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            flexDirection: "row",
+                                            marginTop: 15,
+                                        }}
+                                    >
+                                        <Text style={{ color: "#fff", fontSize: 16 }}>${i.price}</Text>
+
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setData(prev => {
+                                                    const alreadySelected = prev.productIds.includes(i._id);
+                                                    const updatedProductIds = alreadySelected
+                                                        ? prev.productIds.filter(id => id !== i._id)
+                                                        : [...prev.productIds, i._id];
+                                                    return { ...prev, productIds: updatedProductIds };
+                                                });
+                                            }}
+                                            style={{
+                                                backgroundColor: data?.productIds?.includes(i._id)
+                                                    ? "#FFA500"
+                                                    : "#fff",
+                                                width: 120,
+                                                borderWidth: 1,
+                                                borderRadius: 25,
+                                                padding: 10,
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color: data?.productIds?.includes(i._id) ? "#fff" : "#000",
+                                                }}
+                                            >
+                                                {data?.productIds?.includes(i._id)
+                                                    ? "Selected"
+                                                    : "Select Product"}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
                         </ScrollView>
                     </Pressable>
                 </Pressable>
             </Modal>
-        </View>
+
+
+
+        </KeyboardAvoidingView>
     );
 };
 
@@ -281,7 +423,16 @@ const styles = StyleSheet.create({
     opponentName: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
     opponentFollowers: { color: '#999', fontSize: 12 },
     opponentStatus: { color: '#0f0', fontSize: 12, marginTop: 2 },
-    inviteButton: { backgroundColor: '#F78E1B', borderRadius: 5, paddingVertical: 8, paddingHorizontal: 15 }
+    inviteButton: { backgroundColor: '#F78E1B', borderRadius: 5, paddingVertical: 8, paddingHorizontal: 15 },
+    viewStoreButton: {
+        borderRadius: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 13,
+        alignItems: "center",
+        marginBottom: 20,
+        backgroundColor: "#1A1A1A",
+        width: "100%",
+    },
 });
 
 export default CompetitionsSettings;

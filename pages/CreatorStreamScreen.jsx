@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Platform, View, StyleSheet, TouchableOpacity, Text, Animated, Modal, FlatList, Image, Keyboard, ToastAndroid, TextInput, Pressable } from "react-native";
+import { Platform, View, StyleSheet, TouchableOpacity, Text, Animated, Modal, FlatList, Image, Keyboard, ToastAndroid, TextInput, Pressable, ScrollView } from "react-native";
 import { createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudienceLatencyLevelType, RtcSurfaceView, } from "react-native-agora";
 import config from "../config";
 import Entypo from 'react-native-vector-icons/Entypo';
@@ -54,6 +54,7 @@ const CreatorStreamScreen = ({ route }) => {
     const [bidInfo] = useState(false);
     const [showUserInvitation, setShowUserInvitation] = useState(false)
     const [allUsers, setAllUsers] = useState({});
+    const [giftsData, setGiftsData] = useState([]);
 
     const [token, setToken] = useState("")
     const [channelName] = useState(streamId)
@@ -156,6 +157,16 @@ const CreatorStreamScreen = ({ route }) => {
             let res = await axios.get(`${config.baseUrl}/account/single/${userId}`);
             if (res?.data) {
                 setData(res?.data?.data);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+    const fetchAllGifts = async () => {
+        try {
+            let res = await axios.get(`${config.baseUrl}/gifts/all`);
+            if (res?.data) {
+                setGiftsData(res?.data?.data);
             }
         } catch (error) {
             console.log(error);
@@ -271,6 +282,7 @@ const CreatorStreamScreen = ({ route }) => {
         fetchProfileInfo();
         fetchStreamInfo();
         fetchAllUser()
+        fetchAllGifts()
         // setInterval(() => {
         //     fetchGifts();
         // }, 8000);
@@ -388,8 +400,6 @@ const CreatorStreamScreen = ({ route }) => {
 
 
 
-
-
     return (
         <View style={styles.container}>
 
@@ -416,7 +426,7 @@ const CreatorStreamScreen = ({ route }) => {
             ))}
 
             {!isHost && isJoined && remoteUids.length > 0 && remoteUids.map((uid, index) => (
-                <RtcSurfaceView key={uid} canvas={{ uid, renderMode: 1 }} connection={{ channelId: channelName, localUid }} style={index == 0 ? styles.remoteVideo2 : styles?.remoteVideo}/>
+                <RtcSurfaceView key={uid} canvas={{ uid, renderMode: 1 }} connection={{ channelId: channelName, localUid }} style={index == 0 ? styles.remoteVideo2 : styles?.remoteVideo} />
             ))}
 
             {/* Controls */}
@@ -479,10 +489,30 @@ const CreatorStreamScreen = ({ route }) => {
 
             {gift && (
                 <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
-                    <Image source={giftImages[gift.name]} style={styles.giftImage} />
-                    <Text style={styles.giftText}>{gift.username} sent a gift!</Text>
+                    {
+                        (() => {
+                            const matchedGift = giftsData.find(g => g.title === gift.name);
+
+                            return (
+                                <>
+                                    <Image
+                                        source={{
+                                            uri: matchedGift
+                                                ? matchedGift.image
+                                                : "https://via.placeholder.com/100"
+                                        }}
+                                        style={styles.giftImage}
+                                    />
+                                    <Text style={styles.giftText}>
+                                        {gift.username} sent {matchedGift?.title || "a gift"}!
+                                    </Text>
+                                </>
+                            );
+                        })()
+                    }
                 </Animated.View>
             )}
+
 
             {bidInfo && (
                 <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
@@ -533,76 +563,186 @@ const CreatorStreamScreen = ({ route }) => {
 
             {
                 showShirts &&
-                <View style={{ marginBottom: 20, position: "absolute", bottom: 5, width: "100%", justifyContent: "center", alignItems: "center", zIndex: 10 }}>
-
-                    <View style={{ paddingHorizontal: 25, paddingVertical: 10, backgroundColor: "rgba(121, 121, 121,1)", borderRadius: 20, width: "95%" }}>
-                        <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 20, backgroundColor: "#979797" }}>
+                <View
+                    style={{
+                        marginBottom: 20,
+                        position: "absolute",
+                        bottom: 5,
+                        width: "100%",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        zIndex: 10,
+                        backgroundColor: "rgba(0,0,0,0.1)"
+                    }}
+                >
+                    {/* Show first product as main large image */}
+                    <View
+                        style={{
+                            paddingHorizontal: 25,
+                            paddingVertical: 10,
+                            backgroundColor: "#1A1A1A",
+                            borderRadius: 10,
+                            width: "95%",
+                        }}
+                    >
+                        <View
+                            style={{
+                                justifyContent: "center",
+                                alignItems: "center",
+                                padding: 10,
+                                borderRadius: 10,
+                            }}
+                        >
                             <Image
-                                source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }}
-                                style={{ width: "100%", height: 250, borderRadius: 20, }}
+                                source={{
+                                    uri:
+                                        streamInfo?.productId?.[0]?.images?.[0] ||
+                                        "https://via.placeholder.com/150",
+                                }}
+                                style={{ width: "100%", height: 250, borderRadius: 10 }}
                             />
                         </View>
 
-                        <ScrollView showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={{ marginTop: 10, gap: 10, flexDirection: "row", justifyContent: "space-between", flex: 1 }}>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
+                        {/* Product thumbnails */}
+                        <ScrollView
+                            showsHorizontalScrollIndicator={false}
+                            horizontal
+                            contentContainerStyle={{
+                                marginTop: 10,
+                                gap: 10,
+                                flexDirection: "row",
+                                flex: 1,
+                                gap: 2
+                            }}
+                        >
                         </ScrollView>
                     </View>
 
-                    <View style={{ paddingHorizontal: 25, paddingVertical: 10, backgroundColor: "rgba(121, 121, 121,1)", borderRadius: 20, width: "95%", marginTop: 15 }}>
+                    {/* List of products with quantity and add-to-cart */}
+                    <ScrollView
+                        style={{
+                            maxHeight: 300,
+                            width: "95%",
+                            marginTop: 15,
+                            borderRadius: 10,
+                        }}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {streamInfo?.productId?.map((item) => (
+                            <View
+                                key={item._id}
+                                style={{
+                                    paddingHorizontal: 25,
+                                    paddingVertical: 10,
+                                    backgroundColor: "#1A1A1A",
+                                    borderRadius: 10,
+                                    marginBottom: 15,
+                                }}
+                            >
+                                <View style={{ flexDirection: "row", gap: 10 }}>
+                                    <View
+                                        style={{
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            padding: 10,
+                                            borderRadius: 5,
+                                            backgroundColor: "#1A1A1A",
+                                        }}
+                                    >
+                                        <Image
+                                            source={{
+                                                uri: item?.images?.[0] || "https://via.placeholder.com/150",
+                                            }}
+                                            style={{ width: 30, height: 30 }}
+                                        />
+                                    </View>
 
-                        <View style={{ flexDirection: "row", gap: 10 }}>
-                            <View style={{ justifyContent: "center", alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#979797" }}>
-                                <Image source={{ uri: streamInfo?.productId?.image || "https://via.placeholder.com/150" }} style={{ width: 30, height: 30 }} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ color: "#fff", fontSize: 15 }}>{streamInfo?.productId?.title}</Text>
-                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
-                                    <Text style={{ color: "#fff", fontSize: 15 }}>${streamInfo?.productId?.price}</Text>
-                                    <View style={{ flexDirection: "row", gap: 5, alignItems: "center" }}>
-                                        <Pressable onPress={() => setQuantity(quantity + 1)}><AntDesign name="plus" size={15} color="#fff" /></Pressable>
-                                        <Text style={{ color: "#fff", fontSize: 15 }}>{quantity}</Text>
-                                        <Pressable onPress={() => setQuantity(quantity - 1)}><AntDesign name="minus" size={15} color="#fff" /></Pressable>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: "#fff", fontSize: 15 }}>{item.title}</Text>
+
+                                        <View
+                                            style={{
+                                                flexDirection: "row",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                flex: 1,
+                                            }}
+                                        >
+                                            <Text style={{ color: "#fff", fontSize: 15 }}>${item.price}</Text>
+                                            {/* <View
+                                                style={{
+                                                    flexDirection: "row",
+                                                    gap: 5,
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <Pressable onPress={() => setQuantity(quantity + 1)}>
+                                                    <AntDesign name="plus" size={15} color="#fff" />
+                                                </Pressable>
+                                                <Text style={{ color: "#fff", fontSize: 15 }}>{quantity}</Text>
+                                                <Pressable
+                                                    onPress={() => {
+                                                        if (quantity > 1) setQuantity(quantity - 1);
+                                                    }}
+                                                >
+                                                    <AntDesign name="minus" size={15} color="#fff" />
+                                                </Pressable>
+                                            </View> */}
+                                        </View>
                                     </View>
                                 </View>
+
+                                <View
+                                    style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        flex: 1,
+                                        marginTop: 10,
+                                    }}
+                                >
+                                    <View>
+                                        <Text style={{ color: "#fff" }}>Total</Text>
+                                        <Text style={{ color: "#fff", fontSize: 20 }}>
+                                            ${(item.price * quantity).toFixed(2)}
+                                        </Text>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            handleAddToCard(item);
+                                            setshowShirts(false);
+                                        }}
+                                        style={{
+                                            backgroundColor: "#fff",
+                                            borderRadius: 20,
+                                            paddingHorizontal: 15,
+                                            paddingVertical: 5,
+                                        }}
+                                    >
+                                        <Text style={{ color: "#000" }}>Add to cart</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-
-
-                        </View>
-
-                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: 1, marginTop: 10 }}>
-                            <View>
-                                <Text>Total</Text>
-                                <Text style={{ color: "#fff", fontSize: 20 }}>${streamInfo?.productId?.price * quantity}</Text>
-                            </View>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                <TouchableOpacity onPress={() => { handleAddToCard(streamInfo?.productId); setshowShirts(false) }} style={{ backgroundColor: "#fff", borderRadius: 20 }}>
-                                    <Text style={{ padding: 5, paddingHorizontal: 10, color: "#000" }}>Add to cart</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
-                        </TouchableOpacity>
-
-
-                    </View>
-
+                        ))}
+                    </ScrollView>
+                    <TouchableOpacity
+                        onPress={() => setshowShirts(false)}
+                        style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#1a1a1a",
+                            padding: 10,
+                            borderRadius: 10,
+                            marginBottom: 20,
+                            width: "95%"
+                        }}
+                    >
+                        <Text style={{ color: "#fff", fontSize: 17 }}>Close</Text>
+                    </TouchableOpacity>
                 </View>
+
             }
 
 
@@ -619,71 +759,18 @@ const CreatorStreamScreen = ({ route }) => {
                     </View>
 
                     <View style={{ flexDirection: "row", columnGap: 23, flexWrap: "wrap" }}>
-                        <Pressable onPress={() => { handleSendGifts(10, "Santa") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Santa} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Santa</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>10</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(20, "Img2") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img2} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Eagle</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>20</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(15, "Img3") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img3} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Rose</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>15</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(22, "Img4") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img4} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Boxing</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>22</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(21, "Img5") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img5} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Sunflower</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>21</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(100, "Img6") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img6} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Zebra</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>100</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(29, "Img7") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img7} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Heart</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>29</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-                        <Pressable onPress={() => { handleSendGifts(150, "Img8") }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                            <Image source={Img8} />
-                            <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>Lion</Text>
-                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                <AntDesign name="bank" size={13} color="orange" />
-                                <Text style={{ color: "#fff", marginLeft: 5 }}>150</Text>
-                            </TouchableOpacity>
-                        </Pressable>
-
+                        {
+                            giftsData?.map((i) => (
+                                <Pressable key={i?._id} onPress={() => { handleSendGifts(i?.coin, i?.title) }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
+                                    <Image source={{ uri: i?.image }} style={{ width: 80, height: 80, borderRadius: 10 }} />
+                                    <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>{i?.title}</Text>
+                                    <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
+                                        <AntDesign name="bank" size={13} color="orange" />
+                                        <Text style={{ color: "#fff", marginLeft: 5 }}>{i?.coin}</Text>
+                                    </TouchableOpacity>
+                                </Pressable>
+                            ))
+                        }
                     </View>
 
                     <TouchableOpacity onPress={() => setshowGifts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>

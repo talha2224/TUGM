@@ -37,6 +37,8 @@ import { perksData } from '../../constant/perk';
 import io from "socket.io-client";
 import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
 import { BlurView } from '@react-native-community/blur';
+import { useDispatch } from 'react-redux';
+import { addToCart } from '../../redux/cartSlice';
 
 const appId = config.appId;
 const localUid = 0;
@@ -346,12 +348,15 @@ const Competition = ({ route }) => {
         socketRef.current = io(config.socketUrl, { transports: ["websocket"] });
         socketRef.current.emit("join", { streamId });
         socketRef.current.on("newMessage", (msg) => {
+            console.log('newMessage')
             setComments(prev => [msg, ...prev]);
         });
-        socketRef.current.on("voteUpdate", (battleData) => {
-            setStreamInfo(battleData);
+        socketRef.current.on("voteUpdate", (data) => {
+            console.log(data, 'voteUpdate')
+            setStreamInfo(data);
         });
         socketRef.current.on("newPerk", (data) => {
+            console.log('newPerk');
             setPerkMessage(`${data.user.username} used ${data.perk.name}: ${data.perk.description}`);
             if (data.perk.name === 'Item Slam') {
                 setShowSlamItem(true);
@@ -383,7 +388,6 @@ const Competition = ({ route }) => {
         };
     }, [streamId]);
 
-
     useFocusEffect(
         React.useCallback(() => {
             StatusBar.setHidden(true);
@@ -414,6 +418,7 @@ const Competition = ({ route }) => {
     };
     const creatorBadge = getStatusAndColor("creator");
     const opponentBadge = getStatusAndColor("opponent");
+    const dispatch = useDispatch();
 
     return (
         <KeyboardAwareScrollView contentContainerStyle={styles.container} enableOnAndroid={true}>
@@ -595,6 +600,7 @@ const Competition = ({ route }) => {
                         </View>
                     </View>
                 ))}
+
                 <View style={styles.commentInputBar}>
 
                     <TouchableOpacity style={styles.giftButton}>
@@ -616,6 +622,29 @@ const Competition = ({ route }) => {
                     </TouchableOpacity>
 
                 </View>
+                <ScrollView horizontal contentContainerStyle={{ marginTop: 20, paddingBottom: 50 }}>
+                    {
+                        streamInfo?.productId?.map((i) => (
+                            <View key={i?._id} style={{ marginBottom: 50, marginRight: 20, width: streamInfo?.productId?.length > 1 ? 300 : "100%", backgroundColor: "#fff", borderRadius: 6, flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, paddingHorizontal: 10 }}>
+                                <Image source={{ uri: i?.images[0] }} style={{ width: 70, height: 70, borderRadius: 10 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text>{i?.title}</Text>
+                                    <Text style={{ marginTop: 4 }}>⭐ 4.0 {i?.stock} left</Text>
+                                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                                        <Text>${i?.price}{/* <Text style={{ color: "red" }}>${i?.price}</Text> */}</Text>
+                                        <TouchableOpacity onPress={() => {
+                                            dispatch(addToCart({ ...streamInfo?.productId, quantity: 1 }));
+                                            ToastAndroid.show('Item Added In Cart', ToastAndroid.SHORT);
+                                        }} style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#000", borderRadius: 100, justifyContent: "center", alignItems: "center" }}>
+                                            <Text style={{ color: "#fff", fontSize: 10 }}>Add to cart</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                        ))
+                    }
+
+                </ScrollView>
             </ScrollView>
 
             <View style={styles.actionBar}>
@@ -1025,7 +1054,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 8,
-        marginBottom: 40,
+        marginBottom: 10,
     },
 
     cartIconContainer: {
