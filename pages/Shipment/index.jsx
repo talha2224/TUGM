@@ -1,29 +1,47 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import { useNavigation } from '@react-navigation/core';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import config from '../../config';
 
-const shipmentData = [
-    { id: 1, recipient: 'danbrtech', date: '01-30-2025', items: 2, status: 'Delivered & Paid Out', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 2, recipient: 'kallashk', date: '01-30-2025', items: 1, status: 'Delivered & Paid Out', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 3, recipient: 'newuser99', date: '01-28-2025', items: 4, status: 'Needs Label', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 4, recipient: 'simon006', date: '01-27-2025', items: 2, status: 'Unfulfilled', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 5, recipient: 'HeroCoder', date: '01-26-2025', items: 1, status: 'Shipping', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 6, recipient: 'consult.xxxx', date: '01-25-2025', items: 2, status: 'Pickup', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 7, recipient: 'chrisrocky', date: '01-20-2025', items: 2, status: 'Cancelled', tracking: '3932029', service: 'USPS Ground Advantage' },
-    { id: 8, recipient: 'janedoe123', date: '01-20-2025', items: 2, status: 'Delivered & Paid Out', tracking: '3932029', service: 'USPS Ground Advantage' },
-];
 const Shipments = () => {
     const shippingServiceImageUrl = 'https://www.ecommercebytes.com/wp-content/uploads/2017/06/USPS.jpg';
     const navigation = useNavigation();
+    const [orders, setOrders] = useState([])
+
+
+    const fetchProduct = async () => {
+        let userId = await AsyncStorage.getItem('userId');
+        try {
+            let res = await axios.get(`${config.baseUrl}/order/seller/${userId}`)
+            if (res?.data) {
+                setOrders(res?.data?.data);
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    }
+
+    useEffect(() => {
+        fetchProduct()
+    }, [])
+
+    let sales = orders.reduce((acc, cur) => (acc + cur.total), 0)
+    let sales_wihout = orders.filter(order => order.status !== "cancelled").reduce((acc, cur) => acc + cur.total, 0);
+    let total_cancelled = orders.filter(order => order.status !== "cancelled");
+    let total_delivered = orders.filter(order => order.status == "delivered");
+    let total_ongoing = orders.filter(order => order.status == "ongoing");
 
 
     const getStatusStyle = (status) => {
         switch (status) {
-            case 'Delivered & Paid Out':
+            case 'delivered':
                 return styles.statusDelivered;
-            case 'Needs Label':
+            case 'ongoing':
                 return styles.statusNeedsLabel;
             case 'Unfulfilled':
                 return styles.statusUnfulfilled;
@@ -31,7 +49,7 @@ const Shipments = () => {
                 return styles.statusShipping;
             case 'Pickup':
                 return styles.statusPickup;
-            case 'Cancelled':
+            case 'cancelled':
                 return styles.statusCancelled;
             default:
                 return {};
@@ -51,11 +69,11 @@ const Shipments = () => {
             <View style={styles.summaryGrid}>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>Sales</Text>
-                    <Text style={styles.summaryValue}>$200.00</Text>
+                    <Text style={styles.summaryValue}>${sales}</Text>
                 </View>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>Completed Earnings</Text>
-                    <Text style={styles.summaryValue}>$300.20</Text>
+                    <Text style={styles.summaryValue}>${sales_wihout}</Text>
                 </View>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>Shipping Speed</Text>
@@ -63,29 +81,17 @@ const Shipments = () => {
                 </View>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>Items Sold</Text>
-                    <Text style={styles.summaryValue}>20</Text>
+                    <Text style={styles.summaryValue}>{total_cancelled?.length}</Text>
                 </View>
                 <View style={[styles.summaryItem, styles.summaryItemSpan]}>
                     <Text style={styles.summaryLabel}>Total Delivered</Text>
-                    <Text style={styles.summaryValue}>20</Text>
+                    <Text style={styles.summaryValue}>{total_delivered.length}</Text>
                 </View>
                 <View style={[styles.summaryItem, styles.summaryItemSpan]}>
                     <Text style={styles.summaryLabel}>Pending Delivery</Text>
-                    <Text style={styles.summaryValue}>0</Text>
+                    <Text style={styles.summaryValue}>{total_ongoing?.length}</Text>
                 </View>
             </View>
-
-            {/* Navigation Tabs */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsContainer}>
-                {['All', 'Delivered', 'Unfulfilled', 'Pickup', 'Needs Label', 'Cancelled', 'Shipping'].map((tab) => (
-                    <TouchableOpacity
-                        key={tab}
-                        style={[styles.tabButton, tab === 'All' ? styles.tabButtonActive : styles.tabButtonInactive]}
-                    >
-                        <Text style={tab === 'All' ? styles.tabTextActive : styles.tabTextInactive}>{tab}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
 
             {/* Search Bar */}
             <View style={styles.searchContainer}>
@@ -95,24 +101,6 @@ const Shipments = () => {
                     placeholder="Username, order ID..."
                     placeholderTextColor="#A0A0A0"
                 />
-            </View>
-
-            {/* Pagination */}
-            <View style={styles.paginationContainer}>
-                <TouchableOpacity>
-                    <Feather name="chevron-left" size={24} color="#A0A0A0" /> {/* Chevron left icon */}
-                </TouchableOpacity>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                    <TouchableOpacity
-                        key={num}
-                        style={[styles.pageButton, num === 1 ? styles.pageButtonActive : styles.pageButtonInactive]}
-                    >
-                        <Text style={num === 1 ? styles.pageTextActive : styles.pageTextInactive}>{num}</Text>
-                    </TouchableOpacity>
-                ))}
-                <TouchableOpacity>
-                    <Feather name="chevron-right" size={24} color="#A0A0A0" /> {/* Chevron right icon */}
-                </TouchableOpacity>
             </View>
 
             {/* Shipment List Items */}
@@ -133,27 +121,38 @@ const Shipments = () => {
 
                     {/* Table Rows */}
                     <ScrollView style={{ maxHeight: 400 }}>
-                        {shipmentData.map((item, index) => (
+                        {orders.map((item, index) => (
                             <TouchableOpacity
                                 key={item.id}
                                 style={styles.listItem}
-                                onPress={() => navigation.navigate('shipment_detail', { shipment: item })}
+                                onPress={() => {
+                                    if (item.status == "ongoing") {
+                                        navigation.navigate('shipment_detail', { shipment: item })
+                                    }
+                                }}
                             >
                                 <Text style={[styles.tableCell, { width: 50 }]}>{index + 1}</Text>
-                                <Text style={[styles.tableCell, { width: 120 }]}>{item.recipient}</Text>
-                                <Text style={[styles.tableCell, { width: 100 }]}>{item.date}</Text>
-                                <Text style={[styles.tableCell, { width: 60 }]}>{item.items}</Text>
-                                <Text style={[styles.tableCell, { width: 80 }]}>${(item.items * 3).toFixed(2)}</Text>
-                                <Text style={[styles.tableCell, { width: 80 }]}>{item.items * 7} oz</Text>
-                                <Text style={[styles.tableCell, { width: 120 }]}>12 × 12 × 12 in</Text>
+                                <Text style={[styles.tableCell, { width: 120 }]}>{item.userId?.username}</Text>
+                                <Text style={[styles.tableCell, { width: 100 }]}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                                <Text style={[styles.tableCell, { width: 60 }]}>{1}</Text>
+                                <Text style={[styles.tableCell, { width: 80 }]}>${item?.total}</Text>
+                                <Text style={[styles.tableCell, { width: 80 }]}>{item.productId?.weight} oz</Text>
+                                <Text style={[styles.tableCell, { width: 120 }]}>{item.productId?.dimensions}</Text>
                                 <View style={[styles.tableCell, { width: 120 }]}>
                                     <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
                                         <Text style={styles.statusBadgeText}>{item.status}</Text>
                                     </View>
                                 </View>
-                                <View style={[styles.tableCell, { width: 200, flexDirection: 'row', alignItems: 'center', marginLeft: 30 }]}>
-                                    <Image source={{ uri: shippingServiceImageUrl }} style={styles.shippingServiceImage} />
-                                    <Text style={styles.listItemTextSmall}>{item.service}...{item.tracking}</Text>
+                                <View style={[styles.tableCell, { width: 200, marginLeft: 30 }]}>
+                                    {
+                                        item?.shipmentPdfUrl ? (
+                                            <View style={{ width: "100%", flexDirection: 'row', alignItems: 'center', }}>
+                                                <Image source={{ uri: shippingServiceImageUrl }} style={styles.shippingServiceImage} />
+                                                <Text style={styles.listItemTextSmall}>USPS GROUND ADVANTAGE</Text>
+                                            </View>
+                                        ) :
+                                            <Text style={styles.listItemTextSmall}>-</Text>
+                                    }
                                 </View>
                             </TouchableOpacity>
                         ))}

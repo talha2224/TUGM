@@ -1,99 +1,145 @@
-import { useNavigation } from '@react-navigation/core';
+import { useNavigation, useRoute } from '@react-navigation/core';
+import axios from 'axios';
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, PermissionsAndroid } from 'react-native';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
-
-const shipment = {
-    orderId: '0022291',
-    shipmentId: '9303939',
-    itemCount: 1,
-    itemName: 'Yellow T-Shirt',
-    itemDescription: 'No stain quality yellow T-Shirt',
-    status: 'Delivered',
-    shippingAddress: '4517 Washington Ave. Manchester, Kentucky 39495 US',
-    trackingId: '393550301157285020625250',
-    orderDate: '01-30-2025',
-    dimensions: '12 x 12 x 12 in',
-    weight: '7 oz',
-    value: '$2.99',
-};
+import config from '../../config';
+import RNFS from "react-native-fs";
+import { Alert, Platform } from "react-native";
+import { encode } from 'base64-arraybuffer';
+import RNFetchBlob from 'rn-fetch-blob';
 
 const ShipmentDetailScreen = () => {
-
     const navigation = useNavigation();
+    const route = useRoute();
+    const { shipment } = route.params;
 
-    const handlePrintShippingLabel = () => {
-        console.log('Print Shipping Label clicked');
-    };
+    const handlePrintShippingLabel = async () => {
+        try {
+            const url = `${config.baseUrl}/order/print/${shipment._id}`;
+            const fileName = `shipment_${shipment._id}.pdf`;
 
-    const handlePrintPackingSlip = () => {
-        console.log('Print Packing Slip clicked');
+            // Fetch PDF as arraybuffer
+            const response = await axios.post(url, {}, { responseType: 'arraybuffer' });
+            const base64Data = encode(response.data);
+
+            if (Platform.OS === 'android') {
+                const version = Platform.Version;
+
+                // Android 11+ needs MANAGE_EXTERNAL_STORAGE or use app folder
+                let hasPermission = true;
+
+                if (version < 33) {
+                    // Android <= 12
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                        {
+                            title: 'Storage Permission Required',
+                            message: 'App needs access to your storage to save the PDF',
+                            buttonPositive: 'OK',
+                        }
+                    );
+                    hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
+                }
+
+                if (!hasPermission) {
+                    Alert.alert('Permission Denied', 'Cannot save PDF without storage permission');
+                    return;
+                }
+
+                // Get directories
+                const dirs = RNFetchBlob.fs.dirs;
+                const path = `${dirs.DownloadDir}/${fileName}`; // Downloads folder
+
+                // Save file
+                await RNFetchBlob.fs.writeFile(path, base64Data, 'base64');
+
+                // Show in Downloads app
+                RNFetchBlob.android.addCompleteDownload({
+                    title: fileName,
+                    description: 'Shipment PDF',
+                    mime: 'application/pdf',
+                    path,
+                    showNotification: true,
+                    open: true,
+                });
+
+                Alert.alert('Success', `PDF saved to Downloads`);
+                console.log('PDF saved at:', path);
+            } else {
+                // iOS: save to DocumentDir
+                const path = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+                await RNFS.writeFile(path, base64Data, 'base64');
+                Alert.alert('Success', `PDF saved to Documents`);
+                console.log('PDF saved at:', path);
+            }
+        } catch (err) {
+            console.error(err);
+            Alert.alert('Error', 'Failed to save PDF');
+        }
     };
 
     const handleTrackingLink = () => {
+        if (!shipment.trackingId) return;
         const trackingUrl = `https://tools.usps.com/go/TrackConfirmAction?tLabels=${shipment.trackingId}`;
         Linking.openURL(trackingUrl).catch(err => console.error("Couldn't load page", err));
     };
-
     return (
         <ScrollView style={styles.container}>
 
             <View style={styles.header}>
                 <Text style={styles.tugmText}>TUGM</Text>
-                <TouchableOpacity onPress={()=>navigation.goBack()} style={styles.closeButton}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
                     <AntDesign name="close" size={24} color="#A0A0A0" />
                 </TouchableOpacity>
             </View>
 
-            <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
-
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <Text style={styles.shipmentsTitle}>Shipments</Text>
                 <View>
-                    <View style={styles.itemCountBadge}>
-                        <Text style={styles.itemCountText}>{shipment.itemCount} Item</Text>
+                    <View style={[styles.deliveredBadge, { backgroundColor: "#FF6600" }]}>
+                        <Text style={styles.itemCountText}>{shipment.quantity} Item</Text>
                     </View>
-                    <Text style={styles.shipmentIdText}>#{shipment.shipmentId}</Text>
-                    <View style={styles.deliveredBadge}>
+                    <Text style={styles.shipmentIdText}>#{shipment._id}</Text>
+                    <View style={[styles.deliveredBadge, { backgroundColor: shipment.status === "delivered" ? "#28A745" : "#F78E1B" }]}>
                         <Text style={styles.deliveredText}>{shipment.status}</Text>
                     </View>
                 </View>
-
             </View>
-
 
             {/* Order Information */}
             <View style={styles.section}>
-                <Text style={styles.orderNumberText}>Order - #{shipment.orderId}</Text>
+                <Text style={styles.orderNumberText}>Order - #{shipment._id}</Text>
                 <View style={styles.itemRow}>
-                    <Text style={styles.itemNameText}>{shipment.itemName}</Text>
+                    <Text style={styles.itemNameText}>{shipment?.productId?.title}</Text>
                     <View style={styles.soldBadge}>
-                        <Text style={styles.soldText}>Sold</Text>
+                        <Text style={styles.soldText}>{shipment?.quantity} QTY</Text>
                     </View>
                 </View>
-                <Text style={styles.itemDescriptionText}>{shipment.itemDescription}</Text>
+                <Text style={styles.itemDescriptionText}>{shipment?.productId?.description}</Text>
             </View>
 
             {/* Shipping Actions */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Shipping actions</Text>
                 <Text style={styles.shippingLabel}>Ship to</Text>
-                <Text style={styles.shippingAddress}>{shipment.shippingAddress}</Text>
+                <Text style={styles.shippingAddress}>
+                    {shipment.customer_address}, {shipment.city}, {shipment.state}, {shipment.country}
+                </Text>
 
-                <View style={styles.trackingRow}>
-                    <Text style={styles.shippingLabel}>Tracking ID</Text>
-                    <TouchableOpacity onPress={handleTrackingLink}>
-                        <Text style={styles.trackingIdText}>{shipment.trackingId}</Text>
-                    </TouchableOpacity>
-                </View>
+                {shipment.trackingId && (
+                    <View style={styles.trackingRow}>
+                        <Text style={styles.shippingLabel}>Tracking ID</Text>
+                        <TouchableOpacity onPress={handleTrackingLink}>
+                            <Text style={styles.trackingIdText}>{shipment.trackingId}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 <TouchableOpacity style={styles.actionButton} onPress={handlePrintShippingLabel}>
                     <Feather name="printer" size={20} color="#FFFFFF" />
                     <Text style={styles.actionButtonText}>Print Shipping Label</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={handlePrintPackingSlip}>
-                    <Feather name="file-text" size={20} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>Print Packing Slip</Text>
                 </TouchableOpacity>
             </View>
 
@@ -102,27 +148,27 @@ const ShipmentDetailScreen = () => {
                 <Text style={styles.sectionTitle}>Shipment Details</Text>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Shipment #</Text>
-                    <Text style={[styles.detailValueBold,{color:"#FEEF06"}]}>{shipment.shipmentId}</Text>
+                    <Text style={[styles.detailValueBold, { color: "#FEEF06" }]}>{shipment._id}</Text>
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Order</Text>
-                    <Text style={[styles.detailValueBold,{color:"#FEEF06"}]}>{shipment.orderId}</Text>
+                    <Text style={[styles.detailValueBold, { color: "#FEEF06" }]}>{shipment._id}</Text>
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Order date</Text>
-                    <Text style={styles.detailValue}>{shipment.orderDate}</Text>
+                    <Text style={styles.detailValue}>{new Date(shipment.createdAt).toLocaleDateString()}</Text>
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Dimension</Text>
-                    <Text style={styles.detailValue}>{shipment.dimensions}</Text>
+                    <Text style={styles.detailValue}>{shipment.productId?.dimensions || "N/A"}</Text>
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Weight</Text>
-                    <Text style={styles.detailValue}>{shipment.weight}</Text>
+                    <Text style={styles.detailValue}>{shipment.productId?.weight ? `${shipment.productId.weight} oz` : "N/A"}</Text>
                 </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Value</Text>
-                    <Text style={styles.detailValue}>{shipment.value}</Text>
+                    <Text style={styles.detailValue}>${shipment.total}</Text>
                 </View>
             </View>
         </ScrollView>
@@ -163,6 +209,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
         marginBottom: 4,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        width: 60
     },
     itemCountText: {
         color: '#FFFFFF',
@@ -259,8 +309,8 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         flexDirection: 'row',
-        backgroundColor: '#F78E1B', // Orange
-        borderRadius: 100,
+        backgroundColor: '#F78E1B',
+        borderRadius: 10,
         paddingVertical: 15,
         justifyContent: 'center',
         alignItems: 'center',

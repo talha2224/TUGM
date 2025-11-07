@@ -272,6 +272,8 @@ const HomeScreen = () => {
         return `${diffInYears} years ago`;
 
     };
+    
+    console.log(products,'products');
 
     return (
         <View style={styles.container}>
@@ -362,7 +364,7 @@ const HomeScreen = () => {
                             <TouchableOpacity style={[styles.cartButton,{top:40}]} onPress={() => {dispatch(addToFavourite(product));ToastAndroid.show("Item Added",ToastAndroid.SHORT)}}>
                                 <AntDesign name="heart" size={13} color="white" />
                             </TouchableOpacity>
-                            <Image source={{ uri: product.images[0] }} style={styles.productImage} />
+                            <Image source={{ uri: product?.images[0] }} style={styles.productImage} />
                             <View style={styles.productInfo}>
                                 <Text style={styles.productName}>{product?.title}</Text>
                                 <View style={styles.ratingContainer}>

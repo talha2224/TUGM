@@ -177,7 +177,7 @@ const CreateProductScreen = () => {
                 navigation.goBack();
             }
         } catch (error) {
-            console.log("Create product error:", error.response?.data || error.message);
+            console.log("Create product error:", JSON.stringify(error));
             ToastAndroid.show("Failed to publish product", ToastAndroid.SHORT);
         }
     };

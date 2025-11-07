@@ -88,8 +88,6 @@ const CreateStreamScreen = () => {
         const formData = new FormData();
         formData.append("startingBid", data.startingBid);
         formData.append("creatorId", creatorId);
-
-        // ✅ append each selected productId
         data.productId.forEach((id) => formData.append("productId[]", id));
 
         if (data.image) {
@@ -444,7 +442,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
-        paddingTop: 20,
+        paddingTop: 50,
         paddingHorizontal: 20,
         paddingBottom: 70
     },

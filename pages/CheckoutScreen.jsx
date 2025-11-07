@@ -23,6 +23,10 @@ const CheckoutScreen = () => {
     const [isAddressModalVisible, setAddressModalVisible] = useState(false);
     const [isPickupModalVisible, setPickupModalVisible] = useState(false);
     const [customer_address, setCustomer_address] = useState("");
+    const [country, setCountry] = useState("");
+    const [city, setCity] = useState("");
+    const [state, setState] = useState("");
+    const [zip, SetZip] = useState("");
     const [pickup_station, Setpickup_station] = useState("")
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -60,7 +64,7 @@ const CheckoutScreen = () => {
                         return
                     }
                     else {
-                        let res = await axios.post(`${config.baseUrl}/order/checkout`, { userId, pickup_station, customer_address, product: products });
+                        let res = await axios.post(`${config.baseUrl}/order/checkout`, { userId, pickup_station, customer_address, product: products, city, country, zip, state });
                         if (res?.data) {
                             ToastAndroid.show('Order Placed!', ToastAndroid.SHORT);
                             dispatch(clearCart());
@@ -148,7 +152,7 @@ const CheckoutScreen = () => {
                     </View>
                 ))
             }
-            <TouchableOpacity onPress={() => navigation.navigate('CartScreen')} style={styles.goBackToCart}>
+            <TouchableOpacity onPress={() => navigation.navigate('Cart')} style={styles.goBackToCart}>
                 <Text style={styles.goBackText}>Go to cart</Text>
             </TouchableOpacity>
         </ScrollView>
@@ -274,19 +278,45 @@ const CheckoutScreen = () => {
                             style={{ flex: 1, color: "#fff" }}
                         />
                     </View>
+                    <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+                        <TextInput
+                            value={country}
+                            onChangeText={(text) => setCountry(text)}
+                            placeholder="Country"
+                            style={styles.input}
+                        />
+                        <TextInput
+                            value={city}
+                            onChangeText={(text) => setCity(text)}
+                            placeholder="City"
+                            style={styles.input}
+                        />
+                        <TextInput
+                            value={state}
+                            onChangeText={(text) => setState(text)}
+                            placeholder="State"
+                            style={[styles.input, { flex: 1, color: "#fff" }]}
+                        />
+                        <TextInput
+                            value={zip}
+                            onChangeText={(text) => SetZip(text)}
+                            placeholder="Zip"
+                            style={[styles.input, { flex: 1, color: "#fff" }]}
+                        />
+                    </View>
 
                     <Image
                         source={map_img}
                         style={{ width: Dimensions.get("screen").width - 45, marginBottom: 30 }}
                     />
 
-                    <TouchableOpacity onPress={()=>setAddressModalVisible(false)} style={[styles.nextButton,{marginBottom:0}]}>
+                    <TouchableOpacity onPress={() => setAddressModalVisible(false)} style={[styles.nextButton, { marginBottom: 0 }]}>
                         <Text style={styles.nextButtonText}>Save</Text>
                     </TouchableOpacity>
                 </View>
             </View>
         </Modal>
-    ), [isAddressModalVisible, customer_address]);
+    ), [isAddressModalVisible, customer_address, country, city, state, zip]);
 
     const MemoizedPickupModal = useMemo(() => (
         <Modal
@@ -600,6 +630,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         height: 50,
         marginBottom: 20,
+    },
+    input: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        color: "#fff",
+        width: 180,
+        marginVertical: 5,
+        borderRadius: 10,
+        paddingHorizontal: 15,
+        height: 50,
     },
     searchInput: {
         color: '#888',

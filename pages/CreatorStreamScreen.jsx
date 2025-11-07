@@ -7,35 +7,20 @@ import getPermission from "../components/Permission";
 import { useNavigation } from "@react-navigation/core";
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Santa from '../assets/Santa.png';
-import Img2 from '../assets/2.png';
-import Img3 from '../assets/3.png';
-import Img4 from '../assets/4.png';
-import Img5 from '../assets/5.png';
-import Img6 from '../assets/6.png';
-import Img7 from '../assets/7.png';
-import Img8 from '../assets/8.png';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useDispatch } from 'react-redux';
 import { addToCart } from '../redux/cartSlice';
 import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { io } from "socket.io-client";
+import useLiveStreamSocket from "../hooks/socketRef";
 
 
 const appId = config.appId;
 const localUid = 0;
-
-const giftImages = {
-    Santa: Santa,
-    Img2: Img2,
-    Img3: Img3,
-    Img4: Img4,
-    Img5: Img5,
-    Img6: Img6,
-    Img7: Img7,
-    Img8: Img8
-};
 
 const CreatorStreamScreen = ({ route }) => {
     const { streamId, isHost, coHost = false } = route.params;
@@ -69,6 +54,15 @@ const CreatorStreamScreen = ({ route }) => {
     const [showGifts, setshowGifts] = useState(false)
     const [wallet, setwallet] = useState(false)
     const [showBid, setshowBid] = useState(false);
+
+    // CHAT 
+    const [keyboardOpen, setKeyboardOpen] = useState(false);
+    const [comments, setComments] = useState([]);
+    const [message, setMessage] = useState("");
+
+    useLiveStreamSocket(streamId, (msg) => {
+        setComments((prev) => [msg, ...prev]);
+    });
 
 
 
@@ -154,7 +148,7 @@ const CreatorStreamScreen = ({ route }) => {
         try {
             let userId = await AsyncStorage.getItem('userId');
             setuId(userId)
-            let res = await axios.get(`${config.baseUrl}/account/single/${userId}`);
+            let res = await axios.get(`${config.baseUrl2}/account/single/${userId}`);
             if (res?.data) {
                 setData(res?.data?.data);
             }
@@ -164,7 +158,7 @@ const CreatorStreamScreen = ({ route }) => {
     };
     const fetchAllGifts = async () => {
         try {
-            let res = await axios.get(`${config.baseUrl}/gifts/all`);
+            let res = await axios.get(`${config.baseUrl2}/gifts/all`);
             if (res?.data) {
                 setGiftsData(res?.data?.data);
             }
@@ -175,7 +169,7 @@ const CreatorStreamScreen = ({ route }) => {
 
     const fetchAllUser = async () => {
         try {
-            let res = await axios.get(`${config.baseUrl}/account/all`);
+            let res = await axios.get(`${config.baseUrl2}/account/all`);
             if (res?.data) {
                 setAllUsers(res?.data?.data);
             }
@@ -213,7 +207,7 @@ const CreatorStreamScreen = ({ route }) => {
         try {
             if (isHost && !coHost) {
                 let id = await AsyncStorage.getItem('streamId');
-                let res = await axios.put(`${config.baseUrl}/stream/end/${id}`)
+                let res = await axios.put(`${config.baseUrl2}/stream/end/${id}`)
                 if (res?.data?.data) {
                     navigation.navigate('Home')
                     leave()
@@ -235,7 +229,7 @@ const CreatorStreamScreen = ({ route }) => {
         try {
             let userId = await AsyncStorage.getItem('userId');
             if (true) {
-                let res = await axios.get(`${config.baseUrl3}/gift/${userId}/${streamInfo?._id}`);
+                let res = await axios.get(`${config.baseUrl2}/gift/${userId}/${streamInfo?._id}`);
                 if (res?.data?.data) {
                     setGift({
                         streamId: res?.data?.data?.streamId,
@@ -255,6 +249,31 @@ const CreatorStreamScreen = ({ route }) => {
             console.log(error, 'error in fetch gifts')
         }
     }
+    const handleSend = async () => {
+        if (!message.trim()) return;
+        let userId = await AsyncStorage.getItem("userId");
+        try {
+            await axios.post(`${config.baseUrl}/stream/message`, { streamId: streamId, userId, message })
+            setMessage("");
+        } catch (error) {
+            console.log(error, 'erro in handle message send');
+        }
+    };
+
+
+    const fetchMessages = async () => {
+        try {
+            console.log(streamId, 'streamId');
+            let res = await axios.get(`${config.baseUrl}/stream/message/${streamId}`);
+            if (res?.data?.data) {
+                setComments(res.data.data);
+            }
+        } catch (error) {
+            console.log(error, 'ERROR IN FETCH MESSAGES');
+        }
+    };
+
+
 
     const sendInvite = async (userId) => {
         try {
@@ -267,28 +286,6 @@ const CreatorStreamScreen = ({ route }) => {
             ToastAndroid.show("Failed to send invite.", ToastAndroid.SHORT);
         }
     };
-
-    useEffect(() => {
-        const init = async () => {
-            await fetchToken()
-            agoraEngineRef.current?.enableVideo()
-        };
-        init();
-
-        return cleanupAgoraEngine();
-    }, []);
-
-    useEffect(() => {
-        fetchProfileInfo();
-        fetchStreamInfo();
-        fetchAllUser()
-        fetchAllGifts()
-        // setInterval(() => {
-        //     fetchGifts();
-        // }, 8000);
-        // return () => clearInterval(interval);
-    }, [])
-
 
     const handleAddToCard = (product) => {
         ToastAndroid.show('Item Added In Cart', ToastAndroid.SHORT);
@@ -398,10 +395,60 @@ const CreatorStreamScreen = ({ route }) => {
         }
     }
 
+    // useEffect(() => {
+    //     if(streamId){
+    //         console.log('comes her');
+    //         socketRef.current = io(config.socketUrl, { transports: ["websocket"] });
+    //         socketRef.current.emit("join", { streamId });
+    //         socketRef.current.on("newMessage", (msg) => {
+    //             setComments(prev => [msg, ...prev]);
+    //         });
+    //         return () => {
+    //             socketRef.current.disconnect();
+    //         };
+    //     }
+    // }, [streamId]);
+
+
+    useEffect(() => {
+        const init = async () => {
+            await fetchToken()
+            agoraEngineRef.current?.enableVideo()
+        };
+        init();
+
+        return cleanupAgoraEngine();
+    }, []);
+
+    useEffect(() => {
+        fetchMessages();
+        fetchProfileInfo();
+        fetchStreamInfo();
+        fetchAllUser();
+        fetchAllGifts()
+        // const interval = setInterval(() => {
+        //     fetchGifts();
+        // }, 8000);
+        // return () => clearInterval(interval);
+    }, [])
+
+    useEffect(() => {
+        const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+            setKeyboardOpen(true);
+        });
+        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+            setKeyboardOpen(false);
+        });
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
+    }, []);
+
 
 
     return (
-        <View style={styles.container}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.container} enableOnAndroid={true}>
 
 
             {isJoined && isHost && (
@@ -433,20 +480,6 @@ const CreatorStreamScreen = ({ route }) => {
 
             {
                 isHost && (
-                    <View style={styles.controls}>
-                        <TouchableOpacity onPress={toggleMic} style={styles.button}>
-                            <Feather name={isMicMuted ? "mic-off" : "mic"} size={15} color="#fff" />
-
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={switchCamera} style={{ backgroundColor: "#222", width: 40, height: 40, borderRadius: 100, justifyContent: "center", alignItems: "center" }}>
-                            <Entypo name="camera" size={15} />
-                        </TouchableOpacity>
-                    </View>
-                )
-            }
-
-            {
-                isHost && (
                     <TouchableOpacity onPress={() => setShowUserInvitation(true)} style={{ position: "absolute", top: 50, left: "20%", transform: [{ translateX: -50 }], backgroundColor: "gray", padding: 5, borderRadius: 100, flexDirection: "row", alignItems: "center", zIndex: 100 }}>
                         <AntDesign name="plus" size={15} color="#fff" />
                     </TouchableOpacity>
@@ -459,18 +492,23 @@ const CreatorStreamScreen = ({ route }) => {
             </TouchableOpacity>
 
             <Modal animationType="slide" transparent={true} visible={showUserInvitation} onRequestClose={() => setShowUserInvitation(false)}>
-                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+                <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0)", justifyContent: "flex-end" }}>
 
-                    <View style={{ backgroundColor: "rgba(52, 52, 52, 0.8)", padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%", }}>
-                        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>Invite Users</Text>
+                    <View style={{ backgroundColor: "rgba(46, 45, 45, 0.8)", padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%", }}>
+                        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10, color: "white" }}>Invite Users</Text>
 
                         {/* User List */}
                         <FlatList data={allUsers} keyExtractor={(item) => item._id}
                             renderItem={({ item }) => (
 
                                 <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.5)", }}>
-                                    <Image source={{ uri: item.profile }} style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }} />
-                                    <Text style={{ flex: 1, fontSize: 16 }}>{item?.username}</Text>
+                                    <Image
+                                        source={{ uri: item?.profile ? item.profile : "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg?semt=ais_hybrid&w=740&q=80" }
+                                        }
+                                        defaultSource={{uri:"https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg?semt=ais_hybrid&w=740&q=80"}} // iOS only
+                                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
+                                    />
+                                    <Text style={{ flex: 1, fontSize: 16, color: "white" }}>{item?.username}</Text>
                                     <TouchableOpacity style={{ backgroundColor: "#007bff", paddingVertical: 5, paddingHorizontal: 10, borderRadius: 5, }} onPress={() => sendInvite(item._id)}>
                                         <Text style={{ color: "#fff", fontSize: 14 }}>Send Invite</Text>
                                     </TouchableOpacity>
@@ -520,37 +558,56 @@ const CreatorStreamScreen = ({ route }) => {
                 </Animated.View>
             )}
 
-
+            {/* DISABLE THAT  */}
             {
                 !isHost && (
-                    <View style={{ position: 'absolute', top: 100, right: 50 }}>
-                        <View style={{ marginVertical: 5, flexDirection: "row", justifyContent: "flex-start", width: 100 }}>
-                            <Text style={{ color: "white", fontSize: 16, color: "#F78E1B" }}>Bidding {biddingInfo?.length}/3</Text>
-                            <TouchableOpacity onPress={() => { biddingInfo.length >= 3 ? ToastAndroid.show('Bidding Is Over!', ToastAndroid.SHORT) : setshowBid(!showBid) }} style={{ color: "white", backgroundColor: "#F78E1B", paddingHorizontal: 15, borderRadius: 10, marginLeft: 10 }}>
-                                <Text style={{ color: "#fff" }}>Bid</Text>
-                            </TouchableOpacity>
-                        </View>
+                    <View style={{ paddingBottom: 20, position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+                        <TouchableOpacity onPress={() => { biddingInfo.length >= 3 ? ToastAndroid.show('Bidding Is Over!', ToastAndroid.SHORT) : setshowBid(!showBid) }} style={[styles.startAuctionButton, { width: "100%", height: 50, justifyContent: "center" }]}>
+                            <Text style={[styles.startAuctionText, { fontSize: 20 }]}>Bid</Text>
+                        </TouchableOpacity>
                     </View>
                 )
             }
 
-            {
-                !isHost && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, position: 'absolute', bottom: 5, left: 0, right: 0, }}>
-                        <View style={{}}>
-                        </View>
+            {/* DISABLE THAT  */}
+            <View style={{ position: 'absolute', bottom: 150, right: 20, gap: 30 }}>
+                {
+                    !isHost && (
                         <TouchableOpacity onPress={() => setshowShirts(true)} style={styles.iconButton}>
-                            <Ionicons name="cart-outline" size={24} color="white" />
+                            <Ionicons name="cart-outline" size={30} color="white" />
                         </TouchableOpacity>
+                    )
+                }
+                {
+                    !isHost && (
                         <TouchableOpacity onPress={() => setshowGifts(true)} style={styles.iconButton}>
-                            <AntDesign name="gift" size={24} color="white" />
+                            <AntDesign name="gift" size={30} color="white" />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.bidButton} onPress={() => setwallet(true)}>
-                            <Text style={styles.bidButtonText}>$</Text>
+                    )
+                }
+                {
+                    !isHost && (
+                        <TouchableOpacity onPress={() => setwallet(true)} style={styles.iconButton}>
+                            <FontAwesome name="dollar" size={30} color="white" />
                         </TouchableOpacity>
-                    </View>
-                )
-            }
+
+                    )
+                }
+                {
+                    isHost && (
+                        <TouchableOpacity onPress={toggleMic} style={styles.iconButton}>
+                            <Feather name={isMicMuted ? "mic-off" : "mic"} size={30} color="#fff" />
+                        </TouchableOpacity>
+
+                    )
+                }
+                {
+                    isHost &&
+                    <TouchableOpacity onPress={switchCamera} style={styles?.iconButton}>
+                        <Entypo name="camera" size={30} color="#fff" />
+                    </TouchableOpacity>
+                }
+            </View>
 
             {
                 biddingInfo?.some(bid => bid?.userId?._id === uId) && (
@@ -812,7 +869,7 @@ const CreatorStreamScreen = ({ route }) => {
                         <View style={{ backgroundColor: "#5856d6", padding: 10, borderRadius: 10 }}><AntDesign name="creditcard" size={24} color="#fff" /></View>
                         <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#747474"} style={{ flex: 1, height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, }} placeholder='Amount To Bid' />
                     </View>
-                    <View style={styles.buttonContainer}>
+                    <View style={{ flexDirection: "row", marginTop: 20 }}>
                         <TouchableOpacity onPress={() => setshowBid(false)} style={styles.cancelButton}>
                             <Text style={styles.cancelText}>Cancel</Text>
                         </TouchableOpacity>
@@ -824,28 +881,68 @@ const CreatorStreamScreen = ({ route }) => {
             }
 
 
+            <View style={{ position: "absolute", bottom: keyboardOpen ? 400 : 115, left: 30, right: 100, paddingVertical: 10, maxHeight: "50%" }}>
+
+                <View>
+                    <ScrollView style={{ maxHeight: "90%" }} showsVerticalScrollIndicator={false}>
+                        {comments.map((item, index) => (
+                            <View key={index} style={styles.commentItem}>
+                                <Image
+                                    source={{ uri: item.userId?.profile || `https://randomuser.me/api/portraits/men/${index + 1}.jpg` }}
+                                    style={styles.commentAvatar}
+                                />
+                                <View>
+                                    <Text style={styles.commentUser}>{item.userId?.username || "User"}</Text>
+                                    <Text style={styles.commentText}>{item.message}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <View style={styles.commentInputBar}>
+
+                    <View style={styles.commentInputContainer}>
+                        <TextInput
+                            placeholder='Type your comment'
+                            style={styles.commentPlaceholder}
+                            value={message}
+                            onChangeText={setMessage}
+                            placeholderTextColor={"#c2c2c2ff"}
+                        />
+                    </View>
+
+                    <TouchableOpacity style={{ marginLeft: 15 }} onPress={handleSend}>
+                        <Ionicons name="send" size={25} color="#fff" />
+                    </TouchableOpacity>
+
+                </View>
+
+            </View>
 
 
 
 
-        </View>
+
+
+        </KeyboardAwareScrollView>
 
     );
 };
 
 const styles = StyleSheet.create({
     iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        // width: 40,
+        // height: 40,
+        // borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10,
-        backgroundColor: 'rgba(52, 52, 52, 0.8)',
+        // backgroundColor: 'rgba(52, 52, 52, 0.8)',
     },
     container: {
         flex: 1,
         backgroundColor: "#000",
+        flexGrow: 1
     },
     localVideo: {
         position: "absolute",
@@ -947,7 +1044,64 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
+    commentInputBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        marginBottom: 10,
+    },
+    giftButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#2C2C2E',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    commentInputContainer: {
+        flex: 1,
+        borderColor: '#b9b9b9ff',
+        borderWidth: 1,
+        borderRadius: 100,
+        paddingHorizontal: 15,
+        justifyContent: 'center',
+        backgroundColor: "transparent"
+    },
 
+    commentPlaceholder: {
+        color: '#fff',
+    },
+
+    sendButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 10,
+    },
+    commentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    commentAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 40,
+        marginRight: 8,
+    },
+    commentUser: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 13,
+    },
+    commentText: {
+        color: '#ccc',
+        fontSize: 13,
+    },
 });
 
 export default CreatorStreamScreen;
