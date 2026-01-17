@@ -22,9 +22,15 @@ import config from '../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const productSizesOptions = ['XS', 'S', 'M', 'L', 'XL', 'M Tall', 'L Tall', 'XL Tall', 'XXL'];
-const productColorsOptions = ['Red', 'Yellow', 'Orange', 'Pink', 'White', 'Black', 'Brown', 'Magenta', 'Purple'];
 const listingOptions = ['In Stock', 'Few Unit Left', 'Out Of Stock'];
 const shippingOptions = ['Pickup Available', 'State-wide Delivery Available', 'National Delivery Available', 'International Delivery Available'];
+const productColorsOptions = [
+    'Red', 'Yellow', 'Orange', 'Pink', 'White', 'Black', 'Brown', 'Magenta', 'Purple',
+    'Blue', 'Cyan', 'Lime', 'Teal', 'Indigo', 'Violet', 'Gold', 'Silver', 'Maroon',
+    'Olive', 'Navy', 'Coral', 'Salmon', 'Khaki', 'Turquoise', 'Lavender', 'Plum',
+    'Chocolate', 'Crimson', 'Orchid', 'Tan', 'Beige', 'Mint', 'SkyBlue', 'Peach',
+    'Amber', 'Emerald', 'SteelBlue', 'SlateGray', 'Rose'
+];
 
 const CreateProductScreen = () => {
     const navigation = useNavigation();
@@ -450,15 +456,12 @@ const CreateProductScreen = () => {
                                 key={color}
                                 style={[
                                     styles.colorOptionButton,
+                                    { backgroundColor: color.toLowerCase() },
                                     selectedColors.includes(color) && styles.colorOptionButtonSelected,
                                 ]}
                                 onPress={() => toggleProductColor(color)}
                             >
-                                <Text
-                                    style={[
-                                        styles.colorOptionText,
-                                        selectedColors.includes(color) && styles.colorOptionTextSelected,
-                                    ]}
+                                <Text style={{color:"black"}}
                                 >
                                     {color}
                                 </Text>

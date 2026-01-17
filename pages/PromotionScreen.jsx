@@ -10,7 +10,6 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/core'
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
 // Assuming these images are imported and available
 import banner from '../assets/promotion/banner.png'

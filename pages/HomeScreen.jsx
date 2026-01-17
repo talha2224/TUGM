@@ -22,7 +22,6 @@ const HomeScreen = () => {
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [streams, setStreams] = useState([])
-    const [_, setFilterProducts] = useState([]);
     const [uid, setUid] = useState("");
     const [profileData, setprofileData] = useState(null)
     const [stories, setstories] = useState([]);
@@ -94,8 +93,8 @@ const HomeScreen = () => {
     };
     const handleCategoryPress = (category) => {
         setActiveCategory(category);
-        const filtered = products.filter(product => product.categoryId.category === category);
-        setFilterProducts(filtered);
+        // const filtered = products?.filter(product => product.categoryId.category === category);
+        // setFilterProducts(filtered);
     };
     const updateViewers = async (storyId) => {
         try {
@@ -272,15 +271,13 @@ const HomeScreen = () => {
         return `${diffInYears} years ago`;
 
     };
-    
-    console.log(products,'products');
 
     return (
         <View style={styles.container}>
 
             <ScrollView showsVerticalScrollIndicator={false}>
 
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop:40 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 40 }}>
                     <Text style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>TUGM</Text>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Pressable style={{ marginRight: 10 }} onPress={() => { navigation.navigate("Notification") }}>
@@ -361,7 +358,7 @@ const HomeScreen = () => {
                             <TouchableOpacity style={styles.cartButton} onPress={() => handleAddToCard(product)}>
                                 <AntDesign name="plus" size={20} color="white" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.cartButton,{top:40}]} onPress={() => {dispatch(addToFavourite(product));ToastAndroid.show("Item Added",ToastAndroid.SHORT)}}>
+                            <TouchableOpacity style={[styles.cartButton, { top: 40 }]} onPress={() => { dispatch(addToFavourite(product)); ToastAndroid.show("Item Added", ToastAndroid.SHORT) }}>
                                 <AntDesign name="heart" size={13} color="white" />
                             </TouchableOpacity>
                             <Image source={{ uri: product?.images[0] }} style={styles.productImage} />

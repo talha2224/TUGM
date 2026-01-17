@@ -23,11 +23,8 @@ const ProfileScreen = () => {
     const [sellerMode, setSellerMode] = useState(false);
 
     const menuItems = [
-        // { icon: <Feather name="user" size={20} color="white" />, text: 'Edit profile' },
-        { icon: <Feather name="repeat" size={20} color="white" />, text: 'Transaction' },
-        { icon: <Feather name="credit-card" size={20} color="white" />, text: 'My wallet' },
-        { icon: <Feather name="clock" size={20} color="white" />, text: 'History' },
-        { icon: <Feather name="settings" size={20} color="white" />, text: 'Settings' },
+        {link:"transaction_history",icon: <Feather name="repeat" size={20} color="white" />, text: 'Transaction' },
+        {link:"MyOrders",icon: <Feather name="clock" size={20} color="white" />, text: 'History' },
     ];
 
     const fetchProfileInfo = async () => {
@@ -152,7 +149,7 @@ const ProfileScreen = () => {
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.menu}>
                 {menuItems.map((item, index) => (
-                    <TouchableOpacity key={index} style={styles.menuItem}>
+                    <TouchableOpacity onPress={()=>navigation.navigate(item.link)} key={index} style={styles.menuItem}>
                         {item.icon}
                         <Text style={styles.menuText}>{item.text}</Text>
                     </TouchableOpacity>

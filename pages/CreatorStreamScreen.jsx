@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Platform, View, StyleSheet, TouchableOpacity, Text, Animated, Modal, FlatList, Image, Keyboard, ToastAndroid, TextInput, Pressable, ScrollView } from "react-native";
+import { Platform, View, StyleSheet, TouchableOpacity, Text, Animated, Modal, FlatList, Image, Keyboard, ToastAndroid, TextInput, Pressable, ScrollView, Alert } from "react-native";
 import { createAgoraRtcEngine, ChannelProfileType, ClientRoleType, AudienceLatencyLevelType, RtcSurfaceView, } from "react-native-agora";
 import config from "../config";
 import Entypo from 'react-native-vector-icons/Entypo';
@@ -9,21 +9,25 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
+import Octicons from 'react-native-vector-icons/Octicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useDispatch } from 'react-redux';
 import { addToCart } from '../redux/cartSlice';
 import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { io } from "socket.io-client";
 import useLiveStreamSocket from "../hooks/socketRef";
-
+import giftImg from '../assets/gift.png'
+import dollarImg from '../assets/dollar.png'
+import TimerModal from "../components/TimerModal";
+import io from "socket.io-client";
 
 const appId = config.appId;
 const localUid = 0;
 
 const CreatorStreamScreen = ({ route }) => {
     const { streamId, isHost, coHost = false } = route.params;
+    const socketRef = useRef(null);
     const agoraEngineRef = useRef(null);
     const eventHandler = useRef(null);
     const navigation = useNavigation();
@@ -34,35 +38,46 @@ const CreatorStreamScreen = ({ route }) => {
     const [isFrontCamera, setIsFrontCamera] = useState(true);
     const [data, setData] = useState({});
     const [streamInfo, setStreamInfo] = useState(null)
+    const [biddings, setBiddings] = useState([])
     const [fadeAnim] = useState(new Animated.Value(0));
     const [gift, setGift] = useState(null);
     const [bidInfo] = useState(false);
     const [showUserInvitation, setShowUserInvitation] = useState(false)
     const [allUsers, setAllUsers] = useState({});
     const [giftsData, setGiftsData] = useState([]);
-
+    const [viewerCount, setViewerCount] = useState(0);
     const [token, setToken] = useState("")
     const [channelName] = useState(streamId)
+
+    const [showProductCards, setShowProductCards] = useState(true);
 
 
     const dispatch = useDispatch();
     const [amount, setAmount] = useState(0);
     const [uId, setuId] = useState("")
-    const [biddingInfo, setbiddingInfo] = useState([])
     const [quantity, setQuantity] = useState(1)
     const [showShirts, setshowShirts] = useState(false)
     const [showGifts, setshowGifts] = useState(false)
     const [wallet, setwallet] = useState(false)
     const [showBid, setshowBid] = useState(false);
 
+    const [showMessages, setshowMessages] = useState(true);
+
     // CHAT 
     const [keyboardOpen, setKeyboardOpen] = useState(false);
+    const [heart, setHeart] = useState(false);
     const [comments, setComments] = useState([]);
     const [message, setMessage] = useState("");
 
-    useLiveStreamSocket(streamId, (msg) => {
-        setComments((prev) => [msg, ...prev]);
-    });
+    const [timerSelectionModal, setTimerSelectionModal] = useState(false)
+    const [timeLeft, setTimeLeft] = useState("");
+    const [endTime, setEndTime] = useState(null);
+    const [showBidNotifcation, setShowBidNotifcation] = useState(false);
+    const [bidNotifcationData, setBidNotifcationData] = useState(null);
+    const [biddingWinner, setBiddingWinner] = useState(false);
+
+
+    useLiveStreamSocket(streamId, setComments);
 
 
 
@@ -86,10 +101,14 @@ const CreatorStreamScreen = ({ route }) => {
         eventHandler.current = {
             onJoinChannelSuccess: () => {
                 setIsJoined(true);
+                if (isHost) {
+                    setViewerCount(1);
+                }
             },
             onUserJoined: (_connection, uid) => {
                 console.log("👤 Remote user joined:", uid);
                 setagoraUid(uid);
+                setViewerCount(prev => prev + 1);
                 setTimeout(() => {
                     setRemoteUids(prev => [...new Set([...prev, uid])]);
                 }, 1000);
@@ -97,6 +116,7 @@ const CreatorStreamScreen = ({ route }) => {
             onUserOffline: (_connection, uid) => {
                 setagoraUid(null)
                 setRemoteUids(prev => prev.filter(id => id !== uid));
+                setViewerCount(prev => Math.max(prev - 1, 0));
             },
         };
         agoraEngineRef.current?.registerEventHandler(eventHandler.current);
@@ -182,12 +202,33 @@ const CreatorStreamScreen = ({ route }) => {
         try {
             let res = await axios.get(`${config.baseUrl}/stream/stream/${streamId}`);
             if (res?.data) {
-                setStreamInfo(res?.data?.data);
+                const info = res.data.data;
+                console.log(info?._id, 'stream info')
+                setStreamInfo(info);
+                const created = new Date(info.createdAt).getTime();
+                const end = created + info.biddingEndTime * 1000;
+                setEndTime(end);
+                fetchBiddings(info?._id);
             }
         } catch (error) {
             console.log(error);
         }
     };
+
+
+
+    const fetchBiddings = async (streamId) => {
+        try {
+            let res = await axios.get(`${config.baseUrl}/stream/biddings/${streamId}`);
+            if (res?.data) {
+                setBiddings(res?.data?.data);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
+
 
     const fetchToken = async () => {
         try {
@@ -224,7 +265,6 @@ const CreatorStreamScreen = ({ route }) => {
             console.log(error)
         }
     }
-
     const fetchGifts = async () => {
         try {
             let userId = await AsyncStorage.getItem('userId');
@@ -251,29 +291,24 @@ const CreatorStreamScreen = ({ route }) => {
     }
     const handleSend = async () => {
         if (!message.trim()) return;
-        let userId = await AsyncStorage.getItem("userId");
         try {
-            await axios.post(`${config.baseUrl}/stream/message`, { streamId: streamId, userId, message })
+            await axios.post(`${config.baseUrl}/stream/message`, { streamId: streamId, userId: uId, message })
             setMessage("");
         } catch (error) {
             console.log(error, 'erro in handle message send');
         }
     };
-
-
     const fetchMessages = async () => {
         try {
             console.log(streamId, 'streamId');
             let res = await axios.get(`${config.baseUrl}/stream/message/${streamId}`);
             if (res?.data?.data) {
-                setComments(res.data.data);
+                setComments(res?.data?.data?.slice(0, 5));
             }
         } catch (error) {
             console.log(error, 'ERROR IN FETCH MESSAGES');
         }
     };
-
-
 
     const sendInvite = async (userId) => {
         try {
@@ -348,17 +383,16 @@ const CreatorStreamScreen = ({ route }) => {
         }
     }
 
-    const handleBid = async () => {
+    const handleBid = async (quickBid = null) => {
         Keyboard.dismiss();
         setshowBid(false)
-        const highestBid = biddingInfo.length > 0 ? Math.max(...biddingInfo.map(bid => Number(bid.amount) || 0)) : (0);
-        if (amount <= highestBid) {
-            Alert.alert("Bid Error", `Your bid must be higher than the current highest bid of $${highestBid}`);
+        if (amount <= currentBid && !quickBid) {
+            Alert.alert("Insufficient Amount", `Your bid must be higher than the current bid of $${currentBid}`);
             return;
         }
-
         try {
-            let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: amount * 100, currency: "usd" });
+            let paymentIntentRes = await axios.post(`${config.baseUrl2}/payment/create-intent`, { amount: quickBid ? quickBid * 100 : amount * 100, currency: "usd" });
+            console.log(paymentIntentRes,'paymentIntentRes')
             if (!paymentIntentRes?.data?.clientSecret) {
                 throw new Error("Failed to fetch payment intent");
             }
@@ -377,14 +411,9 @@ const CreatorStreamScreen = ({ route }) => {
                     }
                     else {
                         let userId = await AsyncStorage.getItem('userId');
-                        // socket.emit("bid", { streamId2: streamId, streamId: streamInfo?._id, userId: userId, amount: Number(amount) });
                         ToastAndroid.show('Bid Added!', ToastAndroid.SHORT);
                         setAmount(0);
-                        setbidInfo({ streamId2: streamId, streamId: streamInfo?._id, userId: userId, amount: Number(amount) });
-                        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-                        setTimeout(() => {
-                            setbidInfo(null);
-                        }, 3000);
+                        await axios.post(`${config.baseUrl}/stream/bidding`, { streamId: streamInfo?._id, bidderId: userId, bidAmount: quickBid ? quickBid : amount });
                     }
                 }
 
@@ -395,20 +424,34 @@ const CreatorStreamScreen = ({ route }) => {
         }
     }
 
-    // useEffect(() => {
-    //     if(streamId){
-    //         console.log('comes her');
-    //         socketRef.current = io(config.socketUrl, { transports: ["websocket"] });
-    //         socketRef.current.emit("join", { streamId });
-    //         socketRef.current.on("newMessage", (msg) => {
-    //             setComments(prev => [msg, ...prev]);
-    //         });
-    //         return () => {
-    //             socketRef.current.disconnect();
-    //         };
-    //     }
-    // }, [streamId]);
+    const followCreator = async (cid, followedBy) => {
+        try {
+            if (!followedBy?.includes(cid)) {
+                let res = await axios.put(`${config.baseUrl2}/account/follow/${uId}/${cid}`);
+                if (res?.data?.data) {
+                    ToastAndroid.show('Now Following Creator!', ToastAndroid.SHORT);
+                    fetchStreamInfo();
+                    fetchProfileInfo()
+                }
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    }
 
+    const handleAddTimer = async (minutes, seconds) => {
+        try {
+            let biddingEndTime = minutes * 60 + seconds;
+            let res = await axios.post(`${config.baseUrl2}/stream/bidding/timer`, { streamId: streamInfo?._id, biddingEndTime });
+            if (res?.data?.data) {
+                ToastAndroid.show('Timer Added!', ToastAndroid.SHORT);
+                fetchStreamInfo();
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    }
 
     useEffect(() => {
         const init = async () => {
@@ -426,10 +469,6 @@ const CreatorStreamScreen = ({ route }) => {
         fetchStreamInfo();
         fetchAllUser();
         fetchAllGifts()
-        // const interval = setInterval(() => {
-        //     fetchGifts();
-        // }, 8000);
-        // return () => clearInterval(interval);
     }, [])
 
     useEffect(() => {
@@ -445,288 +484,374 @@ const CreatorStreamScreen = ({ route }) => {
         };
     }, []);
 
+    // BIDDING TIMER 
+    useEffect(() => {
+        if (!endTime) return;
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const diff = endTime - now;
+
+            if (diff <= 0) {
+                setTimeLeft("00:00");
+                clearInterval(interval);
+                biddings.length > 0 && setBiddingWinner(true);
+                return;
+            }
+
+            const minutes = Math.floor(diff / 1000 / 60);
+            const seconds = Math.floor((diff / 1000) % 60);
+
+            setTimeLeft(
+                `${minutes.toString().padStart(2, "0")}:${seconds
+                    .toString()
+                    .padStart(2, "0")}`
+            );
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [endTime]);
+
+
+
+    // SOCKET 
+    useEffect(() => {
+        socketRef.current = io(config.socketUrl, { transports: ["websocket"] });
+        socketRef.current.emit("join", { streamId });
+        socketRef.current.on("biddingTimeUpdated", (biddingInfo) => {
+            console.log('biddingTimeUpdated', biddingInfo)
+            fetchStreamInfo()
+        });
+        socketRef.current.on("newBidding", (newBidding) => {
+            console.log('newBidding', newBidding)
+            setShowBidNotifcation(true)
+            setBidNotifcationData(newBidding)
+            fetchStreamInfo()
+            setTimeout(() => {
+                setShowBidNotifcation(false);
+                setBidNotifcationData(null)
+            }, 3000);
+        });
+        return () => {
+            socketRef.current.disconnect();
+        };
+    }, [streamId]);
+
+    const currentBid = biddings.length > 0 ? biddings[0].bidAmount : 0
 
 
     return (
-        <KeyboardAwareScrollView contentContainerStyle={styles.container} enableOnAndroid={true}>
+        <View style={{ flex: 1 }}>
+            <KeyboardAwareScrollView contentContainerStyle={styles.container} enableOnAndroid={true}>
 
 
-            {isJoined && isHost && (
-                <RtcSurfaceView
-                    canvas={{
-                        uid: localUid,
-                        renderMode: 1,
-                        mirrorMode: isFrontCamera ? 1 : 0,
-                    }}
-                    connection={{ channelId: channelName, localUid }}
-                    style={styles.localVideo}
-                />
-            )}
+                {isJoined && isHost && (
+                    <RtcSurfaceView
+                        canvas={{
+                            uid: localUid,
+                            renderMode: 1,
+                            mirrorMode: isFrontCamera ? 1 : 0,
+                        }}
+                        connection={{ channelId: channelName, localUid }}
+                        style={styles.localVideo}
+                    />
+                )}
 
-            {isHost && isJoined && remoteUids?.map(uid => (
-                <RtcSurfaceView
-                    key={uid}
-                    canvas={{ uid, renderMode: 1 }}
-                    connection={{ channelId: channelName, localUid }}
-                    style={styles.remoteVideo}
-                />
-            ))}
+                {isHost && isJoined && remoteUids?.map(uid => (
+                    <RtcSurfaceView
+                        key={uid}
+                        canvas={{ uid, renderMode: 1 }}
+                        connection={{ channelId: channelName, localUid }}
+                        style={styles.remoteVideo}
+                    />
+                ))}
 
-            {!isHost && isJoined && remoteUids.length > 0 && remoteUids.map((uid, index) => (
-                <RtcSurfaceView key={uid} canvas={{ uid, renderMode: 1 }} connection={{ channelId: channelName, localUid }} style={index == 0 ? styles.remoteVideo2 : styles?.remoteVideo} />
-            ))}
+                {!isHost && isJoined && remoteUids.length > 0 && remoteUids.map((uid, index) => (
+                    <RtcSurfaceView key={uid} canvas={{ uid, renderMode: 1 }} connection={{ channelId: channelName, localUid }} style={index == 0 ? styles.remoteVideo2 : styles?.remoteVideo} />
+                ))}
 
-            {/* Controls */}
-
-            {
-                isHost && (
-                    <TouchableOpacity onPress={() => setShowUserInvitation(true)} style={{ position: "absolute", top: 50, left: "20%", transform: [{ translateX: -50 }], backgroundColor: "gray", padding: 5, borderRadius: 100, flexDirection: "row", alignItems: "center", zIndex: 100 }}>
-                        <AntDesign name="plus" size={15} color="#fff" />
-                    </TouchableOpacity>
-                )
-            }
-
-
-            <TouchableOpacity onPress={handleEndStream} style={{ position: "absolute", top: 50, right: 20, backgroundColor: "gray", padding: 5, borderRadius: 100, flexDirection: "row", alignItems: "center", zIndex: 100 }}>
-                <Entypo name='cross' size={22} />
-            </TouchableOpacity>
-
-            <Modal animationType="slide" transparent={true} visible={showUserInvitation} onRequestClose={() => setShowUserInvitation(false)}>
-                <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0)", justifyContent: "flex-end" }}>
-
-                    <View style={{ backgroundColor: "rgba(46, 45, 45, 0.8)", padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%", }}>
-                        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10, color: "white" }}>Invite Users</Text>
-
-                        {/* User List */}
-                        <FlatList data={allUsers} keyExtractor={(item) => item._id}
-                            renderItem={({ item }) => (
-
-                                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.5)", }}>
-                                    <Image
-                                        source={{ uri: item?.profile ? item.profile : "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg?semt=ais_hybrid&w=740&q=80" }
-                                        }
-                                        defaultSource={{uri:"https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg?semt=ais_hybrid&w=740&q=80"}} // iOS only
-                                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
-                                    />
-                                    <Text style={{ flex: 1, fontSize: 16, color: "white" }}>{item?.username}</Text>
-                                    <TouchableOpacity style={{ backgroundColor: "#007bff", paddingVertical: 5, paddingHorizontal: 10, borderRadius: 5, }} onPress={() => sendInvite(item._id)}>
-                                        <Text style={{ color: "#fff", fontSize: 14 }}>Send Invite</Text>
+                <View style={{ position: "absolute", top: 50, left: "5%", justifyContent: "space-between", alignItems: "center", flexDirection: "row", width: "90%" }}>
+                    <View style={{ display: "flex", alignItems: "center", gap: 15, flexDirection: "row" }}>
+                        <View style={{ display: "flex", alignItems: "center", gap: 15, flexDirection: "row" }}>
+                            <View style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65, elevation: 8, backgroundColor: "#9a9a94", paddingHorizontal: 5, paddingVertical: 5, borderRadius: 40, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <Pressable onPress={() => { navigation.navigate("profile_details", { userId: streamInfo?.creatorId?._id }) }} style={{ flexDirection: "row", gap: 6 }}>
+                                    <View style={{ marginLeft: 10 }}>
+                                        <Image source={{ uri: streamInfo?.creatorId?.profile }} style={{ width: 30, height: 30, borderRadius: 20, borderWidth: 1, borderColor: "#FF3729" }} />
+                                        <View style={{ backgroundColor: "#FF3729", borderRadius: 100, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                            <Text style={{ color: "#fff", fontSize: 7 }}>Live</Text>
+                                        </View>
+                                    </View>
+                                    <View>
+                                        <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>{streamInfo?.creatorId?.username}</Text>
+                                        <Text style={{ color: "#fff", fontSize: 10 }}>{streamInfo?.creatorId?.followers ?? 0} Followers</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => { followCreator(streamInfo?.creatorId?._id, streamInfo?.creatorId?.followedBy) }} style={{ backgroundColor: "#FF3729", justifyContent: "center", alignItems: "center", borderRadius: 100, paddingHorizontal: 20, marginLeft: 15 }}>
+                                        <Text style={{ color: "#fff" }}>{streamInfo?.creatorId?.followedBy?.includes(uId) ? "Following" : "Follow"}</Text>
                                     </TouchableOpacity>
-                                </View>
-
-                            )}
-                        />
-
-                        {/* Close Button */}
-                        <TouchableOpacity style={{ backgroundColor: "red", padding: 10, marginTop: 10, borderRadius: 5, alignItems: "center", }} onPress={() => setShowUserInvitation(false)}>
-                            <Text style={{ color: "#fff", fontSize: 14 }}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            {gift && (
-                <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
-                    {
-                        (() => {
-                            const matchedGift = giftsData.find(g => g.title === gift.name);
-
-                            return (
-                                <>
-                                    <Image
-                                        source={{
-                                            uri: matchedGift
-                                                ? matchedGift.image
-                                                : "https://via.placeholder.com/100"
-                                        }}
-                                        style={styles.giftImage}
-                                    />
-                                    <Text style={styles.giftText}>
-                                        {gift.username} sent {matchedGift?.title || "a gift"}!
-                                    </Text>
-                                </>
-                            );
-                        })()
-                    }
-                </Animated.View>
-            )}
-
-
-            {bidInfo && (
-                <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
-                    <Text style={styles.giftText}>{bidInfo?._doc?.username} added a bid! of $ {bidInfo?.amount}</Text>
-                </Animated.View>
-            )}
-
-            {/* DISABLE THAT  */}
-            {
-                !isHost && (
-                    <View style={{ paddingBottom: 20, position: 'absolute', bottom: 20, left: 20, right: 20 }}>
-                        <TouchableOpacity onPress={() => { biddingInfo.length >= 3 ? ToastAndroid.show('Bidding Is Over!', ToastAndroid.SHORT) : setshowBid(!showBid) }} style={[styles.startAuctionButton, { width: "100%", height: 50, justifyContent: "center" }]}>
-                            <Text style={[styles.startAuctionText, { fontSize: 20 }]}>Bid</Text>
-                        </TouchableOpacity>
-                    </View>
-                )
-            }
-
-            {/* DISABLE THAT  */}
-            <View style={{ position: 'absolute', bottom: 150, right: 20, gap: 30 }}>
-                {
-                    !isHost && (
-                        <TouchableOpacity onPress={() => setshowShirts(true)} style={styles.iconButton}>
-                            <Ionicons name="cart-outline" size={30} color="white" />
-                        </TouchableOpacity>
-                    )
-                }
-                {
-                    !isHost && (
-                        <TouchableOpacity onPress={() => setshowGifts(true)} style={styles.iconButton}>
-                            <AntDesign name="gift" size={30} color="white" />
-                        </TouchableOpacity>
-                    )
-                }
-                {
-                    !isHost && (
-                        <TouchableOpacity onPress={() => setwallet(true)} style={styles.iconButton}>
-                            <FontAwesome name="dollar" size={30} color="white" />
-                        </TouchableOpacity>
-
-                    )
-                }
-                {
-                    isHost && (
-                        <TouchableOpacity onPress={toggleMic} style={styles.iconButton}>
-                            <Feather name={isMicMuted ? "mic-off" : "mic"} size={30} color="#fff" />
-                        </TouchableOpacity>
-
-                    )
-                }
-                {
-                    isHost &&
-                    <TouchableOpacity onPress={switchCamera} style={styles?.iconButton}>
-                        <Entypo name="camera" size={30} color="#fff" />
-                    </TouchableOpacity>
-                }
-            </View>
-
-            {
-                biddingInfo?.some(bid => bid?.userId?._id === uId) && (
-                    <View style={{ padding: 10, backgroundColor: "rgba(0, 0, 0, 0.5)", borderRadius: 20, width: 120, marginVertical: 10, position: "absolute", top: "30%", left: "30%" }}>
-                        <Text style={{ color: "#fff", fontWeight: "800" }}> <Text style={{ color: "#F78E1B" }}>$ </Text>  Bid added</Text>
-                    </View>
-                )
-            }
-
-
-            {
-                showShirts &&
-                <View
-                    style={{
-                        marginBottom: 20,
-                        position: "absolute",
-                        bottom: 5,
-                        width: "100%",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        zIndex: 10,
-                        backgroundColor: "rgba(0,0,0,0.1)"
-                    }}
-                >
-                    {/* Show first product as main large image */}
-                    <View
-                        style={{
-                            paddingHorizontal: 25,
-                            paddingVertical: 10,
-                            backgroundColor: "#1A1A1A",
-                            borderRadius: 10,
-                            width: "95%",
-                        }}
-                    >
-                        <View
-                            style={{
-                                justifyContent: "center",
-                                alignItems: "center",
-                                padding: 10,
-                                borderRadius: 10,
-                            }}
-                        >
-                            <Image
-                                source={{
-                                    uri:
-                                        streamInfo?.productId?.[0]?.images?.[0] ||
-                                        "https://via.placeholder.com/150",
-                                }}
-                                style={{ width: "100%", height: 250, borderRadius: 10 }}
-                            />
+                                </Pressable>
+                            </View>
                         </View>
-
-                        {/* Product thumbnails */}
-                        <ScrollView
-                            showsHorizontalScrollIndicator={false}
-                            horizontal
-                            contentContainerStyle={{
-                                marginTop: 10,
-                                gap: 10,
-                                flexDirection: "row",
-                                flex: 1,
-                                gap: 2
-                            }}
-                        >
-                        </ScrollView>
+                        <TouchableOpacity style={{ shadowColor: "white", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65, elevation: 8, backgroundColor: "#9a9a94", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 40, display: "flex", alignItems: "center", flexDirection: "row", gap: 10 }}>
+                            <AntDesign name="eye" size={24} color="white" />
+                            <Text style={{ color: "#fff" }}>{viewerCount == 0 ? 1 : viewerCount}</Text>
+                        </TouchableOpacity>
                     </View>
+                    <TouchableOpacity onPress={handleEndStream} style={{ backgroundColor: "gray", padding: 5, borderRadius: 100, flexDirection: "row", alignItems: "center", zIndex: 100 }}>
+                        <Entypo name='cross' size={22} color={"#fff"} />
+                    </TouchableOpacity>
+                </View>
 
-                    {/* List of products with quantity and add-to-cart */}
-                    <ScrollView
-                        style={{
-                            maxHeight: 300,
-                            width: "95%",
-                            marginTop: 15,
-                            borderRadius: 10,
-                        }}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {streamInfo?.productId?.map((item) => (
-                            <View
-                                key={item._id}
-                                style={{
-                                    paddingHorizontal: 25,
-                                    paddingVertical: 10,
-                                    backgroundColor: "#1A1A1A",
-                                    borderRadius: 10,
-                                    marginBottom: 15,
-                                }}
-                            >
-                                <View style={{ flexDirection: "row", gap: 10 }}>
-                                    <View
-                                        style={{
-                                            justifyContent: "center",
-                                            alignItems: "center",
-                                            padding: 10,
-                                            borderRadius: 5,
-                                            backgroundColor: "#1A1A1A",
-                                        }}
-                                    >
+                {/* BIDDING TIMER  */}
+                <TouchableOpacity onPress={() => { setTimerSelectionModal(true) }} style={{ position: "absolute", top: 120, left: "5%", width: 80, height: 30, borderWidth: 1, borderColor: "#999893", borderRadius: 26, flexDirection: "row", justifyContent: "center", alignItems: "center" }}>
+                    <Text style={{ color: timeLeft && Number(timeLeft.split(":")[0]) * 60 + Number(timeLeft.split(":")[1]) <= 10 ? "red" : "white", fontSize: 14, marginRight: 5 }}>{timeLeft}</Text>
+                    <AntDesign name="plus" size={14} color="white" />
+                </TouchableOpacity>
+
+
+
+                <Modal animationType="slide" transparent={true} visible={showUserInvitation} onRequestClose={() => setShowUserInvitation(false)}>
+                    <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0)", justifyContent: "flex-end" }}>
+
+                        <View style={{ backgroundColor: "rgba(46, 45, 45, 0.8)", padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%", }}>
+                            <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10, color: "white" }}>Invite Users</Text>
+
+                            {/* User List */}
+                            <FlatList data={allUsers} keyExtractor={(item) => item._id}
+                                renderItem={({ item }) => (
+
+                                    <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.5)", }}>
                                         <Image
-                                            source={{
-                                                uri: item?.images?.[0] || "https://via.placeholder.com/150",
-                                            }}
-                                            style={{ width: 30, height: 30 }}
+                                            source={{ uri: item?.profile ? item.profile : "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg?semt=ais_hybrid&w=740&q=80" }
+                                            }
+                                            defaultSource={{ uri: "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg?semt=ais_hybrid&w=740&q=80" }} // iOS only
+                                            style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
                                         />
+                                        <Text style={{ flex: 1, fontSize: 16, color: "white" }}>{item?.username}</Text>
+                                        <TouchableOpacity style={{ backgroundColor: "#007bff", paddingVertical: 5, paddingHorizontal: 10, borderRadius: 5, }} onPress={() => sendInvite(item._id)}>
+                                            <Text style={{ color: "#fff", fontSize: 14 }}>Send Invite</Text>
+                                        </TouchableOpacity>
                                     </View>
 
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={{ color: "#fff", fontSize: 15 }}>{item.title}</Text>
+                                )}
+                            />
 
+                            {/* Close Button */}
+                            <TouchableOpacity style={{ backgroundColor: "red", padding: 10, marginTop: 10, borderRadius: 5, alignItems: "center", }} onPress={() => setShowUserInvitation(false)}>
+                                <Text style={{ color: "#fff", fontSize: 14 }}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                {
+                    gift && (
+                        <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
+                            {
+                                (() => {
+                                    const matchedGift = giftsData.find(g => g.title === gift.name);
+
+                                    return (
+                                        <>
+                                            <Image
+                                                source={{
+                                                    uri: matchedGift
+                                                        ? matchedGift.image
+                                                        : "https://via.placeholder.com/100"
+                                                }}
+                                                style={styles.giftImage}
+                                            />
+                                            <Text style={styles.giftText}>
+                                                {gift.username} sent {matchedGift?.title || "a gift"}!
+                                            </Text>
+                                        </>
+                                    );
+                                })()
+                            }
+                        </Animated.View>
+                    )
+                }
+
+
+                {
+                    bidInfo && (
+                        <Animated.View style={[styles.giftContainer, { opacity: fadeAnim }]}>
+                            <Text style={styles.giftText}>{bidInfo?._doc?.username} added a bid! of $ {bidInfo?.amount}</Text>
+                        </Animated.View>
+                    )
+                }
+
+                {/* DISABLE THAT  */}
+                <View style={{ position: 'absolute', bottom: 250, right: 20, gap: 15, alignItems: "center" }}>
+
+                    {
+                        isHost && (
+                            <TouchableOpacity onPress={toggleMic} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                                {
+                                    isMicMuted ?
+                                        <Octicons name={"mute"} size={20} color="#fff" /> :
+                                        <Feather name={"volume"} style={{ marginLeft: 3 }} size={25} color="#fff" />
+                                }
+                            </TouchableOpacity>
+
+                        )
+                    }
+
+                    {
+                        isHost && (
+
+                            <TouchableOpacity onPress={() => setShowUserInvitation(true)} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                                <AntDesign name="plus" size={20} color="white" />
+                            </TouchableOpacity>
+                        )
+                    }
+                    <TouchableOpacity onPress={() => setHeart(!heart)} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                        <AntDesign name="heart" size={20} color={heart ? "#FF3729" : "#fff"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setshowMessages(!showMessages)} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                        <Feather name="message-circle" size={20} color="white" />
+                    </TouchableOpacity>
+                    {
+                        isHost &&
+                        <TouchableOpacity onPress={switchCamera} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                            <Entypo name="camera" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    }
+                    <TouchableOpacity onPress={() => { setShowProductCards(!showProductCards) }} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                        <Entypo name="chevron-small-down" size={20} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setshowShirts(!showShirts) }} style={{ ...styles.commanStyle, width: 40, height: 40, justifyContent: "center", alignItems: "center" }}>
+                        <Ionicons name="storefront" size={20} color="#F78E1B" />
+                    </TouchableOpacity>
+                    <Text style={{ color: "white", fontSize: 20, marginLeft: 5 }}>${currentBid}</Text>
+                    <View>
+                        <Text style={{ color: timeLeft && Number(timeLeft.split(":")[0]) * 60 + Number(timeLeft.split(":")[1]) <= 10 ? "red" : "white", fontSize: 14, marginRight: 5 }}>{timeLeft}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => {
+                        setAmount(currentBid + 2)
+                        handleBid(currentBid + 2)
+                    }} style={{ backgroundColor: "orange", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 }}>
+                        <Text style={{ color: "white", fontSize: 14 }}>Quick Bid</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {
+                    showBidNotifcation && (
+                        <View style={{ padding: 10, backgroundColor: "#D9D9D961", borderRadius: 20, marginVertical: 10, position: "absolute", top: "30%", left: "30%" }}>
+                            <Text style={{ color: "#fff", fontWeight: "800" }}> {bidNotifcationData?.bidderId?.username} added a ${bidNotifcationData?.bidAmount} Bid</Text>
+                        </View>
+                    )
+                }
+
+
+                {
+                    showShirts &&
+                    <View
+                        style={{
+                            marginBottom: 20,
+                            position: "absolute",
+                            bottom: 5,
+                            width: "100%",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            zIndex: 10,
+                            backgroundColor: "rgba(0,0,0,0.1)"
+                        }}
+                    >
+                        {/* Show first product as main large image */}
+                        <View
+                            style={{
+                                paddingHorizontal: 25,
+                                paddingVertical: 10,
+                                backgroundColor: "#1A1A1A",
+                                borderRadius: 10,
+                                width: "95%",
+                            }}
+                        >
+                            <View
+                                style={{
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    padding: 10,
+                                    borderRadius: 10,
+                                }}
+                            >
+                                <Image
+                                    source={{
+                                        uri:
+                                            streamInfo?.productId?.[0]?.images?.[0] ||
+                                            "https://via.placeholder.com/150",
+                                    }}
+                                    style={{ width: "100%", height: 250, borderRadius: 10 }}
+                                />
+                            </View>
+
+                            {/* Product thumbnails */}
+                            <ScrollView
+                                showsHorizontalScrollIndicator={false}
+                                horizontal
+                                contentContainerStyle={{
+                                    marginTop: 10,
+                                    gap: 10,
+                                    flexDirection: "row",
+                                    flex: 1,
+                                    gap: 2
+                                }}
+                            >
+                            </ScrollView>
+                        </View>
+
+                        {/* List of products with quantity and add-to-cart */}
+                        <ScrollView
+                            style={{
+                                maxHeight: 300,
+                                width: "95%",
+                                marginTop: 15,
+                                borderRadius: 10,
+                            }}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {streamInfo?.productId?.map((item) => (
+                                <View
+                                    key={item._id}
+                                    style={{
+                                        paddingHorizontal: 25,
+                                        paddingVertical: 10,
+                                        backgroundColor: "#1A1A1A",
+                                        borderRadius: 10,
+                                        marginBottom: 15,
+                                    }}
+                                >
+                                    <View style={{ flexDirection: "row", gap: 10 }}>
                                         <View
                                             style={{
-                                                flexDirection: "row",
+                                                justifyContent: "center",
                                                 alignItems: "center",
-                                                justifyContent: "space-between",
-                                                flex: 1,
+                                                padding: 10,
+                                                borderRadius: 5,
+                                                backgroundColor: "#1A1A1A",
                                             }}
                                         >
-                                            <Text style={{ color: "#fff", fontSize: 15 }}>${item.price}</Text>
-                                            {/* <View
+                                            <Image
+                                                source={{
+                                                    uri: item?.images?.[0] || "https://via.placeholder.com/150",
+                                                }}
+                                                style={{ width: 30, height: 30 }}
+                                            />
+                                        </View>
+
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: "#fff", fontSize: 15 }}>{item.title}</Text>
+
+                                            <View
+                                                style={{
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    justifyContent: "space-between",
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                <Text style={{ color: "#fff", fontSize: 15 }}>${item.price}</Text>
+                                                {/* <View
                                                 style={{
                                                     flexDirection: "row",
                                                     gap: 5,
@@ -745,196 +870,255 @@ const CreatorStreamScreen = ({ route }) => {
                                                     <AntDesign name="minus" size={15} color="#fff" />
                                                 </Pressable>
                                             </View> */}
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
 
-                                <View
-                                    style={{
-                                        flexDirection: "row",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        flex: 1,
-                                        marginTop: 10,
-                                    }}
-                                >
-                                    <View>
-                                        <Text style={{ color: "#fff" }}>Total</Text>
-                                        <Text style={{ color: "#fff", fontSize: 20 }}>
-                                            ${(item.price * quantity).toFixed(2)}
-                                        </Text>
-                                    </View>
-
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            handleAddToCard(item);
-                                            setshowShirts(false);
-                                        }}
+                                    <View
                                         style={{
-                                            backgroundColor: "#fff",
-                                            borderRadius: 20,
-                                            paddingHorizontal: 15,
-                                            paddingVertical: 5,
+                                            flexDirection: "row",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            flex: 1,
+                                            marginTop: 10,
                                         }}
                                     >
-                                        <Text style={{ color: "#000" }}>Add to cart</Text>
-                                    </TouchableOpacity>
+                                        <View>
+                                            <Text style={{ color: "#fff" }}>Total</Text>
+                                            <Text style={{ color: "#fff", fontSize: 20 }}>
+                                                ${(item.price * quantity).toFixed(2)}
+                                            </Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                handleAddToCard(item);
+                                                setshowShirts(false);
+                                            }}
+                                            style={{
+                                                backgroundColor: "#fff",
+                                                borderRadius: 20,
+                                                paddingHorizontal: 15,
+                                                paddingVertical: 5,
+                                            }}
+                                        >
+                                            <Text style={{ color: "#000" }}>Add to cart</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
+                            ))}
+                        </ScrollView>
+                        <TouchableOpacity
+                            onPress={() => setshowShirts(false)}
+                            style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "#1a1a1a",
+                                padding: 10,
+                                borderRadius: 10,
+                                marginBottom: 20,
+                                width: "95%"
+                            }}
+                        >
+                            <Text style={{ color: "#fff", fontSize: 17 }}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                }
+
+
+                {
+                    showGifts &&
+                    <View style={{ position: "absolute", left: 10, right: 10, bottom: 5, padding: 20, backgroundColor: "#000", zIndex: 1, width: "95%", borderRadius: 10 }}>
+
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                            <Text style={{ color: "#fff", fontSize: 17 }}>Gifts</Text>
+                            <TouchableOpacity onPress={() => setshowShirts(false)} style={{ backgroundColor: "orange", borderRadius: 15, paddingVertical: 5, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", marginLeft: 10 }}>
+                                <AntDesign name="bank" size={13} color="#fff" />
+                                <Text style={{ color: "#fff", marginLeft: 5 }}>{data?.coins}</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ flexDirection: "row", columnGap: 23, flexWrap: "wrap" }}>
+                            {
+                                giftsData?.map((i) => (
+                                    <Pressable key={i?._id} onPress={() => { handleSendGifts(i?.coin, i?.title) }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
+                                        <Image source={{ uri: i?.image }} style={{ width: 80, height: 80, borderRadius: 10 }} />
+                                        <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>{i?.title}</Text>
+                                        <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
+                                            <AntDesign name="bank" size={13} color="orange" />
+                                            <Text style={{ color: "#fff", marginLeft: 5 }}>{i?.coin}</Text>
+                                        </TouchableOpacity>
+                                    </Pressable>
+                                ))
+                            }
+                        </View>
+
+                        <TouchableOpacity onPress={() => setshowGifts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
+                            <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
+                        </TouchableOpacity>
+
+                    </View>
+                }
+
+                {
+                    wallet &&
+                    <View style={{ position: "absolute", left: 10, right: 10, bottom: 5, padding: 20, backgroundColor: "#000", zIndex: 1, width: "95%", borderRadius: 10 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                            <Text style={{ color: "#fff", fontSize: 17 }}>Coins</Text>
+                            <Text style={{ color: "#fff", fontSize: 17 }}>🪙 {data?.coins}</Text>
+                        </View>
+
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
+                            <View style={{ backgroundColor: "#5856d6", padding: 10, borderRadius: 10 }}><AntDesign name="creditcard" size={24} color="#fff" /></View>
+                            <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#747474"} style={{ flex: 1, height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, }} placeholder='Amount To Buy Coins' />
+                        </View>
+                        <TouchableOpacity onPress={proceed} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "orange", padding: 10, marginTop: 15, borderRadius: 10 }}>
+                            <Text style={{ color: "#fff", fontSize: 17 }}>Pay Now </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setwallet(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
+                            <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
+                        </TouchableOpacity>
+                    </View>
+                }
+
+                {
+                    showBid &&
+                    <View style={{ position: "absolute", left: 20, right: 10, bottom: keyboardOpen ? 400 : 30, padding: 20, backgroundColor: "#000", zIndex: 1, width: "90%", borderRadius: 30 }}>
+                        <View style={{ justifyContent: "center", alignItems: "center", flexDirection: "row", marginTop: 5 }}>
+                            <Text style={{ color: "#fff" }}>$ Add Bid</Text>
+                        </View>
+                        <Text style={{ textAlign: "center", marginVertical: 10, color: "#c4c4c4" }}>Current Bid : ${currentBid}</Text>
+                        <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#fff"} style={{ flex: 1, backgroundColor: "#D9D9D91F", height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, color: "white" }} placeholder='Your Bid' />
+                        <View style={{ flexDirection: "row", marginTop: 20 }}>
+                            <TouchableOpacity onPress={() => setshowBid(false)} style={styles.cancelButton}>
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleBid} style={styles.startAuctionButton}>
+                                <Text style={styles.startAuctionText}>Bid</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                }
+                {
+                    biddingWinner &&
+                    <View style={{ position: "absolute", left: 20, right: 10, bottom: keyboardOpen ? 400 : 30, padding: 20, backgroundColor: "#000", zIndex: 1, width: "90%", borderRadius: 30 }}>
+                        <View style={{ justifyContent: "center", alignItems: "center", flexDirection: "row", marginTop: 5 }}>
+                            <Text style={{ color: "#fff", fontSize: 30 }}>Winner</Text>
+                        </View>
+                        <Text style={{ textAlign: "center", marginVertical: 10, color: "#c4c4c4" }}>Bid Amount : ${biddings[0]?.bidAmount}</Text>
+                        <View style={{ justifyContent: "center", alignItems: "center", flexDirection: "row", marginTop: 5, gap: 10 }}>
+                            {
+                                biddings[0]?.bidderId?.profile && (
+                                    <Image source={{ uri: biddings[0]?.bidderId?.profile }} style={{ width: 40, height: 40, borderRadius: 40, marginBottom: 10 }} />
+                                )
+                            }
+                            <Text style={{ color: "#fff", fontSize: 15 }}>{biddings[0]?.bidderId?.username} has won the bidding</Text>
+                        </View>
+                        <View style={{ flexDirection: "row", marginTop: 20 }}>
+                            <TouchableOpacity onPress={() => setBiddingWinner(false)} style={[styles.cancelButton, { flex: 1 }]}>
+                                <Text style={styles.cancelText}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                }
+
+
+                <View style={{ position: "absolute", bottom: keyboardOpen ? 200 : 40, left: 10, paddingVertical: 10, maxHeight: "50%" }}>
+
+                    {/* COMMENTS  */}
+                    {
+                        showMessages && (
+                            <View>
+                                {comments.map((item, index) => (
+                                    <View key={index} style={styles.commentItem}>
+                                        <Image
+                                            source={{
+                                                uri: item.userId?.profile || `https://randomuser.me/api/portraits/men/${index + 1}.jpg`,
+                                            }}
+                                            style={styles.commentAvatar}
+                                        />
+                                        <View>
+                                            <Text style={styles.commentUser}>{item.userId?.username || "User"}</Text>
+                                            <Text style={styles.commentText}>{item.message}</Text>
+                                        </View>
+                                    </View>
+                                ))}
                             </View>
-                        ))}
-                    </ScrollView>
-                    <TouchableOpacity
-                        onPress={() => setshowShirts(false)}
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            backgroundColor: "#1a1a1a",
-                            padding: 10,
-                            borderRadius: 10,
-                            marginBottom: 20,
-                            width: "95%"
-                        }}
-                    >
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Close</Text>
-                    </TouchableOpacity>
-                </View>
+                        )
+                    }
 
-            }
+                    {/* PRODUCT CARDS  */}
+                    {
+                        showProductCards && (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                {
+                                    streamInfo?.productId?.map((i) => (
+                                        <View key={i?._id} style={{ ...styles.cardStyle, width: 250, padding: 20, borderRadius: 20, marginBottom: 20, marginRight: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                                            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                                                <Image source={{ uri: i?.images?.[0] || "https://via.placeholder.com/150", }} style={{ width: 50, height: 50, borderRadius: 10 }} />
+                                                <View>
+                                                    <Text style={{ color: "white" }}>{i?.title}</Text>
+                                                    <Text style={{ color: "#C4C4C4" }}>In stock - {i?.stock}</Text>
+                                                    <Text style={{ color: "white" }}>$ {i?.price}</Text>
+                                                </View>
+                                            </View>
+                                            <Pressable onPress={() => handleAddToCard(i)}>
+                                                <Feather name="plus-circle" size={25} color="#fff" />
+                                            </Pressable>
+                                        </View>
+                                    ))
+                                }
+                            </ScrollView>
+                        )
+                    }
 
+                    {/* BOTTOM ICONS  */}
+                    <View style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexDirection: "row", gap: 10, width: "75%" }}>
+                        <View style={styles.commentInputContainer}>
+                            <TextInput
+                                placeholder='Add comment'
+                                style={styles.commentPlaceholder}
+                                value={message}
+                                onChangeText={setMessage}
+                                placeholderTextColor={"#fff"}
+                            />
+                            <TouchableOpacity style={{ marginLeft: 15 }} onPress={handleSend}>
+                                <FontAwesome name="send" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
 
-            {
-                showGifts &&
-                <View style={{ position: "absolute", left: 10, right: 10, bottom: 5, padding: 20, backgroundColor: "#000", zIndex: 1, width: "95%", borderRadius: 10 }}>
+                        <Pressable onPress={() => { setshowShirts(true) }} style={styles.commanStyle}>
+                            <Ionicons name="cart-outline" size={20} color="#fff" />
+                        </Pressable>
+                        <Pressable onPress={() => { setshowGifts(true) }} style={styles.commanStyle}>
+                            <Image source={giftImg} style={{ width: 20, height: 20 }} />
+                        </Pressable>
+                        <Pressable onPress={() => { setshowBid(true) }} style={{ ...styles.commanStyle, backgroundColor: '#F78E1B', }}>
+                            <Image source={dollarImg} style={{ width: 20, height: 20 }} />
+                        </Pressable>
 
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Gifts</Text>
-                        <TouchableOpacity onPress={() => setshowShirts(false)} style={{ backgroundColor: "orange", borderRadius: 15, paddingVertical: 5, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", marginLeft: 10 }}>
-                            <AntDesign name="bank" size={13} color="#fff" />
-                            <Text style={{ color: "#fff", marginLeft: 5 }}>{data?.coins}</Text>
-                        </TouchableOpacity>
                     </View>
 
-                    <View style={{ flexDirection: "row", columnGap: 23, flexWrap: "wrap" }}>
-                        {
-                            giftsData?.map((i) => (
-                                <Pressable key={i?._id} onPress={() => { handleSendGifts(i?.coin, i?.title) }} style={{ backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                                    <Image source={{ uri: i?.image }} style={{ width: 80, height: 80, borderRadius: 10 }} />
-                                    <Text style={{ color: "#fff", textAlign: "center", marginTop: 4 }}>{i?.title}</Text>
-                                    <TouchableOpacity onPress={() => setshowShirts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 }}>
-                                        <AntDesign name="bank" size={13} color="orange" />
-                                        <Text style={{ color: "#fff", marginLeft: 5 }}>{i?.coin}</Text>
-                                    </TouchableOpacity>
-                                </Pressable>
-                            ))
-                        }
-                    </View>
 
-                    <TouchableOpacity onPress={() => setshowGifts(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
-                    </TouchableOpacity>
-
-                </View>
-            }
-
-            {
-                wallet &&
-                <View style={{ position: "absolute", left: 10, right: 10, bottom: 5, padding: 20, backgroundColor: "#000", zIndex: 1, width: "95%", borderRadius: 10 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Coins</Text>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>🪙 {data?.coins}</Text>
-                    </View>
-
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <View style={{ backgroundColor: "#5856d6", padding: 10, borderRadius: 10 }}><AntDesign name="creditcard" size={24} color="#fff" /></View>
-                        <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#747474"} style={{ flex: 1, height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, }} placeholder='Amount To Buy Coins' />
-                    </View>
-                    <TouchableOpacity onPress={proceed} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "orange", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Pay Now </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setwallet(false)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <Text style={{ color: "#fff", fontSize: 17 }}>Close </Text>
-                    </TouchableOpacity>
-                </View>
-            }
-
-            {
-                showBid &&
-                <View style={{ position: "absolute", left: 20, right: 10, bottom: 30, padding: 20, backgroundColor: "#000", zIndex: 1, width: "90%", borderRadius: 30 }}>
-                    <View style={{ justifyContent: "center", alignItems: "center", flexDirection: "row", marginTop: 5 }}>
-                        <Text style={{ color: "#fff" }}>$ Add Bid</Text>
-                    </View>
-                    <Text style={{ textAlign: "center", marginTop: 10, color: "#c4c4c4" }}>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium</Text>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#343434", padding: 10, marginTop: 15, borderRadius: 10 }}>
-                        <View style={{ backgroundColor: "#5856d6", padding: 10, borderRadius: 10 }}><AntDesign name="creditcard" size={24} color="#fff" /></View>
-                        <TextInput keyboardType="numeric" value={amount.toString()} onChangeText={(text) => setAmount(text ? parseInt(text) : '')} placeholderTextColor={"#747474"} style={{ flex: 1, height: 50, paddingHorizontal: 20, borderWidth: 1, borderColor: "#747474", marginLeft: 10, borderRadius: 10, }} placeholder='Amount To Bid' />
-                    </View>
-                    <View style={{ flexDirection: "row", marginTop: 20 }}>
-                        <TouchableOpacity onPress={() => setshowBid(false)} style={styles.cancelButton}>
-                            <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleBid} style={styles.startAuctionButton}>
-                            <Text style={styles.startAuctionText}>Bid</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            }
-
-
-            <View style={{ position: "absolute", bottom: keyboardOpen ? 400 : 115, left: 30, right: 100, paddingVertical: 10, maxHeight: "50%" }}>
-
-                <View>
-                    <ScrollView style={{ maxHeight: "90%" }} showsVerticalScrollIndicator={false}>
-                        {comments.map((item, index) => (
-                            <View key={index} style={styles.commentItem}>
-                                <Image
-                                    source={{ uri: item.userId?.profile || `https://randomuser.me/api/portraits/men/${index + 1}.jpg` }}
-                                    style={styles.commentAvatar}
-                                />
-                                <View>
-                                    <Text style={styles.commentUser}>{item.userId?.username || "User"}</Text>
-                                    <Text style={styles.commentText}>{item.message}</Text>
-                                </View>
-                            </View>
-                        ))}
-                    </ScrollView>
-                </View>
-
-                <View style={styles.commentInputBar}>
-
-                    <View style={styles.commentInputContainer}>
-                        <TextInput
-                            placeholder='Type your comment'
-                            style={styles.commentPlaceholder}
-                            value={message}
-                            onChangeText={setMessage}
-                            placeholderTextColor={"#c2c2c2ff"}
-                        />
-                    </View>
-
-                    <TouchableOpacity style={{ marginLeft: 15 }} onPress={handleSend}>
-                        <Ionicons name="send" size={25} color="#fff" />
-                    </TouchableOpacity>
 
                 </View>
 
-            </View>
+            </KeyboardAwareScrollView >
+            <TimerModal
+                visible={timerSelectionModal}
+                hide={() => setTimerSelectionModal(false)}
+                addTime={handleAddTimer}
+            />
 
-
-
-
-
-
-        </KeyboardAwareScrollView>
+        </View>
 
     );
 };
 
 const styles = StyleSheet.create({
     iconButton: {
-        // width: 40,
-        // height: 40,
-        // borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         // backgroundColor: 'rgba(52, 52, 52, 0.8)',
@@ -1045,10 +1229,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     commentInputBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        marginBottom: 10,
     },
     giftButton: {
         width: 36,
@@ -1060,19 +1240,31 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     commentInputContainer: {
-        flex: 1,
-        borderColor: '#b9b9b9ff',
-        borderWidth: 1,
-        borderRadius: 100,
+        borderRadius: 200,
         paddingHorizontal: 15,
-        justifyContent: 'center',
-        backgroundColor: "transparent"
+        paddingVertical: 5,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexDirection: 'row',
+        backgroundColor: '#2c2c2eff',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.8,
+                shadowRadius: 5,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
+        maxWidth: 200
     },
 
     commentPlaceholder: {
         color: '#fff',
+        flex: 1,
     },
-
     sendButton: {
         width: 36,
         height: 36,
@@ -1102,6 +1294,36 @@ const styles = StyleSheet.create({
         color: '#ccc',
         fontSize: 13,
     },
+    commanStyle: {
+        padding: 10,
+        borderRadius: 1000,
+        backgroundColor: '#2c2c2eff',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.8,
+                shadowRadius: 5,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
+    },
+    cardStyle: {
+        backgroundColor: '#2c2c2eff',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.8,
+                shadowRadius: 5,
+            },
+            android: {
+                elevation: 10,
+            },
+        }),
+    }
 });
 
 export default CreatorStreamScreen;

@@ -104,7 +104,7 @@ const RegisterScreen = () => {
                     </TouchableOpacity>
 
                     <Text style={styles.orText}>Or</Text>
-
+{/* 
                     <TouchableOpacity style={styles.socialButton}>
                         <Image source={{ uri: "https://cdn1.iconfinder.com/data/icons/google-s-logo/150/Google_Icons-09-512.png" }} style={styles.socialIcon} resizeMode="contain" />
                         <Text style={styles.socialButtonText}>Continue with Google</Text>
@@ -113,7 +113,7 @@ const RegisterScreen = () => {
                     <TouchableOpacity style={styles.socialButton}>
                         <Image source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/1667px-Apple_logo_black.svg.png" }} style={styles.socialIcon} resizeMode="contain" />
                         <Text style={styles.socialButtonText}>Continue with Apple</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
             </View>
         </ImageBackground>

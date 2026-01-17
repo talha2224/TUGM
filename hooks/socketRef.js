@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import config from '../config'; // your base socket url
-
+import config from '../config';
 export default function useLiveStreamSocket(streamId, onNewMessage) {
   const socketRef = useRef(null);
 
   useEffect(() => {
     if (!streamId) return;
 
-    // ✅ connect with auto-reconnect options
+    // Connect to socket
     socketRef.current = io(config.socketUrl, {
       transports: ['websocket'],
       reconnection: true,
@@ -17,15 +16,21 @@ export default function useLiveStreamSocket(streamId, onNewMessage) {
       forceNew: true,
     });
 
-    // ✅ join room
+    // Join room
     socketRef.current.emit('join', { streamId });
 
-    // ✅ listen for messages
     socketRef.current.on('newMessage', (msg) => {
-      onNewMessage && onNewMessage(msg);
+      if (onNewMessage) {
+        onNewMessage((prev) => {
+          const updated = [msg, ...prev];
+          if (updated.length > 5) {
+            return updated.slice(0, 5);
+          }
+          return updated;
+        });
+      }
     });
 
-    // ✅ handle reconnection
     socketRef.current.on('connect', () => {
       console.log('✅ Socket connected');
       socketRef.current.emit('join', { streamId });
@@ -35,7 +40,6 @@ export default function useLiveStreamSocket(streamId, onNewMessage) {
       console.log('❌ Socket disconnected:', reason);
     });
 
-    // ✅ cleanup
     return () => {
       if (socketRef.current) {
         socketRef.current.off('newMessage');

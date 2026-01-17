@@ -36,7 +36,6 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { perksData } from '../../constant/perk';
 import io from "socket.io-client";
 import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
-import { BlurView } from '@react-native-community/blur';
 import { useDispatch } from 'react-redux';
 import { addToCart } from '../../redux/cartSlice';
 

@@ -121,11 +121,11 @@ const CalendarScreen = () => {
                             <AntDesign name="camera" size={17} color="#fff" style={styles.modalIcon} />
                             <Text style={styles.modalText}>LIVE Auction</Text>
                         </TouchableOpacity>
-                        {/* <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Live Competition')}>
+                        <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Live Competition')}>
                             <MaterialCommunityIcons name="trophy-variant-outline" size={17} color="#fff" style={styles.modalIcon} />
-                            <Text style={styles.modalText}>LIVE Competition</Text>
+                            <Text style={styles.modalText} onPress={() => navigation.navigate("create_post")}>Post</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Schedule a show')}>
+                        {/* <TouchableOpacity style={styles.modalItem} onPress={() => handleModalItemPress('Schedule a show')}>
                             <Ionicons name="play-circle-outline" size={17} color="#fff" style={styles.modalIcon} />
                             <Text style={styles.modalText}>Schedule a show</Text>
                         </TouchableOpacity> */}

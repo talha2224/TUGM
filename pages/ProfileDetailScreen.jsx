@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, FlatList, ToastAndroid } from 'react-native'
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-
+import AntDesign from 'react-native-vector-icons/AntDesign';
 import axios from 'axios'
 import config from '../config';
 import { addToFavourite } from '../redux/favouriteSlice';
@@ -17,9 +17,15 @@ const ProfileDetailScreen = ({ route }) => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedTab, setSelectedTab] = useState('Catalogue');
+    const [streams, setStreams] = useState([]);
+    const [posts, setPosts] = useState([]);
+    const [currentUserId, setcurrentUserId] = useState("");
+
     const dispatch = useDispatch()
     const fetchProfileInfo = async () => {
         try {
+            let userId = await AsyncStorage.getItem('userId');
+            setcurrentUserId(userId)
             let res = await axios.get(`${config.baseUrl2}/account/single/${userId}`);
             if (res?.data) {
                 setProfileData(res?.data?.data);
@@ -41,10 +47,51 @@ const ProfileDetailScreen = ({ route }) => {
             setLoading(false);
         }
     };
+    const fetchUserStreams = async () => {
+        try {
+            let res = await axios.get(`${config.baseUrl}/stream/user/${userId}`);
+            if (res?.data) {
+                setStreams(res?.data?.data);
+            }
+        } catch (error) {
+            console.log("Error fetching products:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    const fetchPosts = async () => {
+        try {
+            let res = await axios.get(`${config.baseUrl}/post/user/${userId}`);
+            if (res?.data) {
+                setPosts(res?.data?.data);
+            }
+        } catch (error) {
+            console.log("Error fetching products:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const followCreator = async (cid, followedBy) => {
+        try {
+            if (!followedBy?.includes(cid)) {
+                let res = await axios.put(`${config.baseUrl2}/account/follow/${currentUserId}/${cid}`);
+                if (res?.data?.data) {
+                    ToastAndroid.show('Now Following Creator!', ToastAndroid.SHORT);
+                    fetchProfileInfo()
+                }
+            }
+        }
+        catch (error) {
+            console.log(error)
+        }
+    }
 
     useEffect(() => {
         fetchProfileInfo();
         fetchProducts();
+        fetchUserStreams()
+        fetchPosts()
     }, [userId]);
 
     if (loading) {
@@ -76,6 +123,8 @@ const ProfileDetailScreen = ({ route }) => {
         </View>
     );
 
+    console.log(profileData,'profileData?.followedBy')
+
     const renderProfileSection = () => (
         <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
@@ -85,12 +134,12 @@ const ProfileDetailScreen = ({ route }) => {
                 </View>
             </View>
             <Text style={styles.username}>{displayData?.username}</Text>
-            <View style={styles.ratingContainer}>
+            {/* <View style={styles.ratingContainer}>
                 {[...Array(5)].map((_, i) => (
                     <FontAwesome
                         key={i} name="star" size={16} color={i < Math.floor(3) ? "#FFD700" : "#666"} style={{ marginRight: 2 }} />
                 ))}
-            </View>
+            </View> */}
             <Text style={styles.bioText}>The best shoe seller | Shoe designer | New Balance | Nike | Adidas</Text>
 
             <View style={styles.statsContainer}>
@@ -103,19 +152,16 @@ const ProfileDetailScreen = ({ route }) => {
                     <Text style={styles.statLabel}>Followers</Text>
                 </View>
                 <View style={styles.statItem}>
-                    <Text style={styles.statCount}>{products.length}</Text>
-                    <Text style={styles.statLabel}>Post</Text>
+                    <Text style={styles.statCount}>{streams.length}</Text>
+                    <Text style={styles.statLabel}>Streams</Text>
                 </View>
             </View>
             <View style={styles.buttonContainer}>
                 <TouchableOpacity onPress={handleMessagePress} style={styles.actionButton}>
-                    <Text style={styles.actionButtonText}>Message</Text>
+                    <Text style={styles.actionButtonText}>Share Profile</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
-                    <Text style={styles.actionButtonText}>Unfollow</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.shareButton}>
-                    <Ionicons name="share-outline" size={24} color="white" />
+                <TouchableOpacity onPress={() => { followCreator(userId, profileData?.followedBy) }} style={styles.actionButton}>
+                    <Text style={{ color: "#fff" }}>{profileData?.followedBy?.includes(currentUserId) ? "Following" : "Follow"}</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -123,7 +169,7 @@ const ProfileDetailScreen = ({ route }) => {
 
     const renderTabs = () => (
         <View style={styles.tabsContainer}>
-            {['Catalogue', 'Ratings', 'LIVE', 'Posts'].map(tab => (
+            {['Catalogue', 'Live', 'Posts'].map(tab => (
                 <TouchableOpacity key={tab} style={[styles.actionCategories, selectedTab === tab && styles.actionButton]} onPress={() => setSelectedTab(tab)}>
                     <Text style={styles.tabText}>{tab}</Text>
                 </TouchableOpacity>
@@ -149,6 +195,38 @@ const ProfileDetailScreen = ({ route }) => {
             </View>
         </View>
     );
+    const renderStream = ({ item }) => (
+        <View style={styles.productCard}>
+            <Image source={{ uri: item?.coverImage }} style={styles.productImage} />
+        </View>
+    );
+
+    const renderPost = ({ item }) => {
+        return (
+            <View style={styles.productCard}>
+                <TouchableOpacity
+                    onPress={async () => {
+                        try {
+                            await axios.put(`${config.baseUrl}/post/view/${item._id}`);
+                        } catch (err) {
+                            console.log("Error updating view count", err);
+                        }
+                        navigation.navigate('view_post', { post: item });
+                    }}
+                >
+                    <View style={styles.blurCard}>
+                        <Ionicons name="play-circle-outline" size={50} color="white" />
+                    </View>
+                </TouchableOpacity>
+
+                <View style={{ position: "absolute", bottom: 10, left: 10, flexDirection: "row", alignItems: "center", display: 'flex', gap: 10 }}>
+                    <AntDesign name="eye" color={"white"} />
+                    <Text style={{ color: "white" }}>{item?.views} Views</Text>
+                </View>
+            </View>
+        );
+    };
+
 
     const handleMessagePress = async () => {
         const currentUserId = await AsyncStorage.getItem("userId")
@@ -190,7 +268,29 @@ const ProfileDetailScreen = ({ route }) => {
                         contentContainerStyle={styles.productListContainer}
                     />
                 )}
-                {/* Add other tab content here if needed */}
+                {selectedTab === 'Live' && (
+                    <FlatList
+                        data={streams}
+                        renderItem={renderStream}
+                        keyExtractor={(item) => item._id}
+                        numColumns={2}
+                        columnWrapperStyle={styles.productGrid}
+                        scrollEnabled={false}
+                        contentContainerStyle={styles.productListContainer}
+                    />
+                )}
+                {selectedTab === 'Posts' && (
+                    <FlatList
+                        data={posts}
+                        renderItem={renderPost}
+                        keyExtractor={(item) => item._id}
+                        numColumns={2}
+                        columnWrapperStyle={styles.productGrid}
+                        scrollEnabled={false}
+                        contentContainerStyle={styles.productListContainer}
+                    />
+                )}
+
             </ScrollView>
         </View>
     )
@@ -294,21 +394,20 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         marginHorizontal: 5,
         alignItems: 'center',
-        justifyContent: "center"
+        justifyContent: "center",
+        paddingVertical: 9
     },
     actionCategories: {
         flex: 1,
         backgroundColor: '#1B1B1B',
         borderRadius: 25,
         marginHorizontal: 5,
-        paddingVertical: 10,
         alignItems: 'center',
         justifyContent: "center",
         marginBottom: 15
     },
     actionButtonText: {
         color: 'white',
-        fontWeight: 'bold',
         fontSize: 15
     },
     shareButton: {
@@ -337,7 +436,6 @@ const styles = StyleSheet.create({
     },
     tabText: {
         color: '#ccc',
-        fontWeight: 'bold',
     },
     productListContainer: {
         paddingHorizontal: 10,
@@ -395,7 +493,16 @@ const styles = StyleSheet.create({
         color: 'white',
         textAlign: 'center',
         marginTop: 50,
-    }
+    },
+    blurCard: {
+        width: '100%',
+        height: 180,
+        backgroundColor: '#222',
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+        opacity: 0.7,
+    },
 });
 
 export default ProfileDetailScreen;

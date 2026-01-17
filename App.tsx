@@ -41,6 +41,9 @@ import LiveSupportScreen from './pages/Support/LiveSupportScreen';
 import ProfileDetailScreen from './pages/ProfileDetailScreen';
 import PromotionDetailScreen from './pages/PromotionDetailScreen';
 import PromotionScreen from './pages/PromotionScreen';
+import CreatePost from './pages/CreatePost';
+import ViewPost from './pages/ViewPost';
+import TransactionHistory from './pages/TransactionHistory';
 
 const Stack = createNativeStackNavigator();
 
@@ -85,6 +88,9 @@ export default function App() {
               <Stack.Screen name="live_support" component={LiveSupportScreen} />
               <Stack.Screen name="promotion" component={PromotionScreen} />
               <Stack.Screen name="promotion_details" component={PromotionDetailScreen} />
+              <Stack.Screen name="create_post" component={CreatePost} />
+              <Stack.Screen name="view_post" component={ViewPost} />
+              <Stack.Screen name="transaction_history" component={TransactionHistory} />
             </Stack.Navigator>
           </NavigationContainer>
         </StripeProvider>
